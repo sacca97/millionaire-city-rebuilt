@@ -12,6 +12,7 @@ import { getServerConfig, type ServerConfig } from "./config.js";
 import { MCityDatabase } from "./database.js";
 import { CommandService } from "./commandHandlers.js";
 import { startFacebookShim, type FacebookShimHandle, type FacebookShimPicture } from "./facebookShim.js";
+import { createClientStatic } from "./clientStatic.js";
 import { renderLauncherHtml } from "./launcherHtml.js";
 import { SaveRepository } from "./repository.js";
 import { loadCashToCoins, loadGoldPackageRewards, loadLevelXpThresholds, type GoldPackageReward } from "./rules.js";
@@ -404,6 +405,11 @@ export function createServerApp(config = getServerConfig()): ServerApp {
     console.warn(`[mcity] Missing asset: ${req.originalUrl}`);
     res.status(404).end();
   });
+
+  // Built TypeScript client (npm run build -w @mcity/client); the Flash launcher stays at /launcher.
+  if (fs.existsSync(path.join(config.clientDistPath, "index.html"))) {
+    app.use(createClientStatic(path.resolve(config.clientDistPath)));
+  }
 
   app.post("/Game", (req, res) => {
     const user = repository.ensureDefaultUser();

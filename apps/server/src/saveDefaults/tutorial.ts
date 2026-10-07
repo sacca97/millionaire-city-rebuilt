@@ -72,7 +72,6 @@ export function normalizeCompletedTutorialUniverse(document: JsonObject, nowMs =
   let changed = false;
   changed = normalizeBossGenre(profile) || changed;
   changed = ensureCompletedTutorialMissionState(profile) || changed;
-  changed = normalizeReachedPollMissionState(profile) || changed;
   changed = settleStaleTutorialPollMissions(profile) || changed;
   changed = migrateBoughtRivalItemsToMine(rivalItems, mineItems, String(mineCompany.sid ?? STARTER_COMPANY_MINE_SID)) || changed;
   changed = repairLegacyTutorialBungalowDuplicate(mineItems, nowMs) || changed;
@@ -281,16 +280,6 @@ function ensureCompletedTutorialMissionState(profile: JsonObject): boolean {
   const given = parseChunkSet(findElementChild(missionChildren, "Given"));
   let changed = false;
 
-  if (up.size === 0 && reached.size === 0 && given.size === 0) {
-    for (const sku of TUTORIAL_COMPLETED_INITIAL_MISSIONS) {
-      up.add(sku);
-    }
-    upsertChunkElement(missionChildren, "Up", up);
-    upsertChunkElement(missionChildren, "Reached", reached);
-    upsertChunkElement(missionChildren, "Given", given);
-    changed = true;
-  }
-
   const pollManagerEntry = getOrCreateElementChild(profileChildren, "PollManager");
   const pollChildren = getElementChildren(pollManagerEntry, "PollManager");
   let countEntry = findElementChild(pollChildren, "Count");
@@ -323,13 +312,6 @@ function ensureCompletedTutorialMissionState(profile: JsonObject): boolean {
   if (given.size === 0 && String(profile.firstMission ?? "0") !== "1") {
     profile.firstMission = "1";
     changed = true;
-  }
-
-  for (const rule of UNLOCKED_MISSION_RULES) {
-    if (given.has(rule.requiredSku) && !given.has(rule.sku) && !reached.has(rule.sku) && !up.has(rule.sku)) {
-      up.add(rule.sku);
-      changed = true;
-    }
   }
 
   upsertChunkElement(missionChildren, "Up", up);

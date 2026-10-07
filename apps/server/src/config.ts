@@ -19,6 +19,8 @@ export interface ServerConfig {
   useHttpsFacebookShim: boolean;
   requireHttpsFacebookShim: boolean;
   launchSecret?: string;
+  /** Built TypeScript client (apps/client/dist); served at / when present. */
+  clientDistPath: string;
 }
 
 export function getServerConfig(): ServerConfig {
@@ -42,6 +44,7 @@ export function getServerConfig(): ServerConfig {
     launcherLang: process.env.MCITY_LANG ?? "en_US",
     useHttpsFacebookShim: process.env.MCITY_DISABLE_FB_SHIM === "1" ? false : true,
     requireHttpsFacebookShim: process.env.MCITY_REQUIRE_FB_SHIM === "1",
-    launchSecret: process.env.MCITY_LAUNCH_SECRET || undefined
+    launchSecret: process.env.MCITY_LAUNCH_SECRET || undefined,
+    clientDistPath: process.env.MCITY_CLIENT_DIST ?? path.join(workspaceRoot, "apps", "client", "dist")
   };
 }

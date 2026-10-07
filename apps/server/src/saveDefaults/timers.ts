@@ -42,6 +42,13 @@ export function normalizeHouseRentState(state: JsonObject | undefined, itemChild
     return changed;
   }
 
+  // Mode 6 = GIVING_RENT, i.e. the rent was just collected (SecurityNormal.ST_RENT_MODE_GIVING_RENT, StateOnRent.as:806-816).
+  // GamePlay.updateItem stores mode/time verbatim (GamePlay.java:2465-2470), so keep it instead of turning it into the
+  // collectable mode 5 or the abandon countdown.
+  if (String(state.mode ?? "") === "6") {
+    return changed;
+  }
+
   const contractSku = String(state.contractSku ?? "").trim();
   if (contractSku.length > 0) {
     let normalizedMode = String(state.mode ?? "");
@@ -218,6 +225,10 @@ export function normalizeConstructionState(_itemSku: string, state: JsonObject, 
     changed = true;
   }
   return changed;
+}
+
+export function getContractIncomeTimeMs(contractSku: string): number {
+  return CONTRACT_INCOME_TIME_BY_SKU.get(contractSku) ?? 0;
 }
 
 function getAbandonTimeMs(contractSku: string, fallbackTimeMs = 0): number {

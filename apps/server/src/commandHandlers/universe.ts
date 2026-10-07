@@ -150,6 +150,7 @@ export function getItemStateEntry(itemEntry: MutableNode): MutableNode | undefin
   return findElementChild(getElementChildren(itemEntry, "Item"), "State");
 }
 
+// Original check (GamePlay.upgradeAdd/SecurityNormal.upgradeAdd): state id 1 (on rent) with any mode.
 export function isUpgradeEligibleItem(universe: JsonObject, sid: string): boolean {
   const itemMatch = findItemEntry(universe, sid);
   if (!itemMatch) {
@@ -158,7 +159,7 @@ export function isUpgradeEligibleItem(universe: JsonObject, sid: string): boolea
 
   const state = getItemStateEntry(itemMatch.itemEntry);
   const sku = String(itemMatch.itemEntry.sku ?? "");
-  return sku !== "HeadQuarter" && String(state?.id ?? "") === "1" && String(state?.mode ?? "") === "4";
+  return sku !== "HeadQuarter" && String(state?.id ?? "") === "1";
 }
 
 export function createItemEntry(payload: Record<string, unknown>, companyEntry: MutableNode): MutableNode {

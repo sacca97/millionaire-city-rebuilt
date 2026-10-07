@@ -1,0 +1,5 @@
+[
+  {"pattern": "savedAt|updated_at|lastLogin|timestamp", "reason": "volatile timestamps (also ignored by save-diff.py)"},
+  {"pattern": "dailyRewardsNextRewardId", "reason": "random roll, differs by design (docs/save-parity.md)"},
+  {"pattern": "earnDCCoins", "reason": "accepted difference, no gameplay effect (docs/save-parity.md Round 5)"}
+]

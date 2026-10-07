@@ -34,7 +34,11 @@
     "test": "npm run test -w @mcity/server",
     "typecheck": "npx tsc -b packages/shared/tsconfig.json apps/server/tsconfig.json apps/desktop/tsconfig.json --pretty false",
     "lint:unused": "npx knip --no-progress --workspace @mcity/server --workspace @mcity/desktop --workspace @mcity/shared --include files,exports --include-entry-exports",
-    "lint:cycles": "npx madge --extensions ts --circular apps/server/src apps/desktop/src packages/shared/src"
+    "lint:cycles": "npx madge --extensions ts --circular apps/server/src apps/desktop/src packages/shared/src",
+    "dev:client": "npm run dev -w @mcity/client",
+    "build:client": "npm run build -w @mcity/shared && npm run build -w @mcity/client",
+    "start:rewrite": "npm run build:client && npm run dev:server",
+    "test:rewrite": "npm run test -w @mcity/client && npm run test -w @mcity/server && npm run test -w @mcity/rules"
   },
   "dependencies": {
     "@mcity/shared": "^0.1.0",

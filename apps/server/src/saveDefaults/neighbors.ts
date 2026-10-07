@@ -45,6 +45,24 @@ export function createNeighborUniverse(targetUserId: number, bossGenre = 0): Jso
   return undefined;
 }
 
+/**
+ * Offline stand-in for a real player's city (GamePlay.getWorld with another targetUserId, GamePlay.java:120-230): an empty
+ * tutorial-finished town with the HQ only. Used instead of ever returning the local player's own world for an unknown id.
+ */
+export function createVisitorNeighborUniverse(targetUserId: number): JsonObject {
+  return createNpcUniverseDocument({
+    userId: targetUserId,
+    extId: `visitor-${targetUserId}`,
+    userName: "Neighbor",
+    cityName: "Neighbor City",
+    companyValue: "1000000",
+    hqSkin: "HeadQuarter_01",
+    terrainTiles: [],
+    roadTiles: [],
+    items: [createHeadQuarterItem("1", STARTER_COMPANY_MINE_SID, "-1", "-3", "HeadQuarter_01")]
+  });
+}
+
 function createAdvisorNeighborUniverse(bossGenre: number): JsonObject {
   const isCindy = bossGenre === 1;
 

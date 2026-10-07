@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`full-set run: chains and shared counters > alt: every drivable mission ends GIVEN exactly once, reload keeps it 1`] = `
+[
+  "217",
+  "222",
+  "227",
+  "238",
+]
+`;
+
+exports[`full-set run: chains and shared counters > default: every drivable mission ends GIVEN exactly once, reload keeps it 1`] = `[]`;

@@ -18,7 +18,29 @@ const GAME_CONFIG_DEFAULTS_VERSION = "1";
 const CASH_TO_COINS = 60000;
 
 export class SaveRepository {
+  /**
+   * The incomplete-tutorial repair/reset below only runs for the first compatibility check of this process (server start).
+   * ensureDefaultUser() runs on every request, and the client may place items before it sends tutorial_completed (Game.boot),
+   * so repeating the check mid-session would wipe a live save. A restart with tutorialEnd=0 still resets (with a backup).
+   */
+  private tutorialStartupChecked = false;
+
   constructor(private readonly database: MCityDatabase) {}
+
+  /** Opt-in "play the real tutorial again": back up the DB, reseed a fresh (tutorial-stage) save, keep premium currency. */
+  restartTutorial(userId: number): void {
+    const user = this.database.db
+      .prepare("SELECT id, ext_id FROM users WHERE id = ?")
+      .get(userId) as { id: number; ext_id: string } | undefined;
+    if (!user) {
+      return;
+    }
+    const premium = extractPremiumCurrencyState(this.getDocument<JsonObject>(userId, SAVE_TAGS.universe));
+    this.backupAndSeedFreshSave(user.id, user.ext_id, "restart-tutorial");
+    if (premium.cash > 0 || premium.paidCash > 0) {
+      this.applyPremiumCurrencyCarryover(userId, premium.cash, premium.paidCash);
+    }
+  }
 
   ensureDefaultUser(): UserRow {
     const now = new Date().toISOString();
@@ -40,6 +62,7 @@ export class SaveRepository {
       .get(DEFAULT_USER_ID) as UserRow;
 
     this.seedFreshSave(user.id, user.ext_id);
+    this.tutorialStartupChecked = true; // a brand-new save has nothing to repair
     this.setSession(user.id, crypto.randomBytes(16).toString("hex"), DEFAULT_SYNC);
     return user;
   }
@@ -212,7 +235,9 @@ export class SaveRepository {
         .run(GAME_CONFIG_DEFAULTS_META_KEY, GAME_CONFIG_DEFAULTS_VERSION, new Date().toISOString());
     }
 
-    if (isTutorialIncomplete(universeDoc)) {
+    const runTutorialCheck = !this.tutorialStartupChecked;
+    this.tutorialStartupChecked = true;
+    if (runTutorialCheck && isTutorialIncomplete(universeDoc)) {
       if (shouldResetIncompleteTutorialSave(universeDoc)) {
         const premiumCurrency = extractPremiumCurrencyState(universeDoc);
         this.backupAndSeedFreshSave(userId, userExtId, "incomplete-tutorial-reset");
@@ -300,12 +325,8 @@ function isLegacyBrokenUniverse(document: JsonObject): boolean {
     (entry): entry is JsonObject & { Map: JsonObject[] } =>
       Boolean(entry && typeof entry === "object" && Array.isArray((entry as { Map?: unknown }).Map))
   );
-  const hasTerrain = mapContainer?.Map.some(
-    (entry) => Boolean(entry && typeof entry === "object" && Array.isArray((entry as { Terrain?: unknown }).Terrain))
-  );
-  const hasRoad = mapContainer?.Map.some(
-    (entry) => Boolean(entry && typeof entry === "object" && Array.isArray((entry as { Road?: unknown }).Road))
-  );
+  // NOTE: an empty Map (player deleted every road/terrain tile) is a valid save; never treat it as broken or the
+  // startup check would back up and reseed the whole city (data-loss bug).
 
   const usesTutorialStarterPlots = plotType === "";
   const usesConcretePlotState = plotCount === 25 || plotCount === 36;
@@ -315,9 +336,7 @@ function isLegacyBrokenUniverse(document: JsonObject): boolean {
     companyWhose.size < 2 ||
     !companyWhose.has("0") ||
     !companyWhose.has("1") ||
-    !mapContainer ||
-    !hasTerrain ||
-    !hasRoad
+    !mapContainer
   );
 }
 

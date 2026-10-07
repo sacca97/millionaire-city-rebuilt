@@ -1,3 +1,6 @@
+import path from "path";
+import { loadDefinitionAttributes } from "./rules.js";
+import { RULES_ROOT } from "./saveDefaults/paths.js";
 import {
   DEFAULT_USER_ID,
   DEFAULT_SYNC,
@@ -11,7 +14,9 @@ import type { JsonObject } from "@mcity/shared/dist/types.js";
 import type { SaveRepository } from "./repository.js";
 import {
   createNeighborUniverse,
+  createVisitorNeighborUniverse,
   normalizeConstructionState,
+  getContractIncomeTimeMs,
   normalizeHouseRentState,
   normalizeCompletedTutorialUniverse
 } from "./saveDefaults.js";
@@ -27,7 +32,10 @@ import {
 } from "./saveTree.js";
 import {
   collapsePendingCollectibleState,
+  MAX_COLLECTIBLE_UNITS,
+  getTradeInCollectibleSkus,
   isCollectibleAwardMutation,
+  pushAskedCollectible,
   isCollectibleFeatureUnlocked,
   normalizeCollectiblePendingDocument,
   normalizeCollectiblesDocument,
@@ -43,6 +51,7 @@ import {
 } from "./commandHandlers/collectibles.js";
 import { decodeAsciiCodes, encodeAsciiCodes, sanitizeForClientXml, sanitizeStoredString, sanitizeUniverseForClient } from "./commandHandlers/encoding.js";
 import {
+  CASH_TO_COINS,
   applyMoneySecuritySnapshot,
   applyMoneySecuritySnapshotWithPositiveDeltaFallback,
   applyPositiveMoneySecurityDeltas,
@@ -79,9 +88,74 @@ import {
   type MutableNode
 } from "./commandHandlers/universe.js";
 import { getLocalDayKey, getStoredUpgradeRecords, setStoredUpgradeRecords, VISITOR_UPGRADES_PER_DAY } from "./commandHandlers/upgrades.js";
+import {
+  INVEST,
+  OFFLINE_FRIEND_COMPANY_VALUE,
+  NEW_ITEMS_REV,
+  addToProfile,
+  addUnlockedItem,
+  adjustStorage,
+  applyDailyRewardGiven,
+  applyProfileFlag,
+  applyServicePresentationShown,
+  applyServicePurchase,
+  findInvestment,
+  getAcceleratorStorage,
+  getBoxPrize,
+  getDailyRewardDefinition,
+  getServiceDefinition,
+  getStorageAmount,
+  levelFromExp,
+  newsFeedReward,
+  projectServiceTimes,
+  refreshDailyRewardsInfo,
+  getMissionReward,
+  stepMission,
+  DAILY_BONUS_TIME_MS,
+  DAILY_BONUS_COINS,
+  refreshInvestments
+} from "./commandHandlers/offline.js";
 
 export class CommandService {
+  /** UserData.mDoubleRentAvailable[0] (houses only; in-memory like the Java session, never persisted). */
+  private readonly doubleRentHousesAvailable = new Map<number, boolean>();
+
   constructor(private readonly repository: SaveRepository) {}
+
+  /**
+   * SecurityNormal.java:466-481 + Server.java:265-278 + GamePlay.initializeUserSpecialAttributes (:2848-2890): when a house rent is
+   * collected (State 5 -> 1/14) the client's `doubleRent` param consumes the prize; if none is pending a 0-99 roll is compared
+   * with the summed incomeValue of the built (state 5) incomeMultiplier wonders targeting Houses and, on a hit, the server pushes
+   * {_cmd:"doubleRent",_dat:"Houses"} exactly once. Commerces never roll in the original.
+   */
+  private rollDoubleRent(
+    userId: number,
+    universe: JsonObject,
+    itemEntry: MutableNode,
+    payload: Record<string, unknown>,
+    previousStateId: string,
+    previousMode: string
+  ): PacketCommand | undefined {
+    const newMode = String(payload.mode ?? "");
+    if (
+      !isHouseSku(String(itemEntry.sku ?? "")) ||
+      previousStateId === "0" ||
+      previousMode !== "5" ||
+      (newMode !== "1" && newMode !== "14")
+    ) {
+      return undefined;
+    }
+    if (payload.doubleRent != null) {
+      this.doubleRentHousesAvailable.set(userId, false);
+    }
+    if (this.doubleRentHousesAvailable.get(userId)) {
+      return undefined;
+    }
+    const probability = getDoubleRentHousesProbability(universe);
+    const hit = Math.floor(Math.random() * 100) < probability;
+    this.doubleRentHousesAvailable.set(userId, hit);
+    return hit ? { _cmd: "doubleRent", _dat: "Houses" as never, _sync: DEFAULT_SYNC } : undefined;
+  }
 
   handleCommand(userId: number, command: PacketCommand): PacketCommand[] {
     if (command._cmd === "ping" || command._cmd === "empty") {
@@ -143,6 +217,7 @@ export class CommandService {
         const collectiblesDocument = this.getNormalizedCollectiblesDocument(userId);
         const targetUserId = Number(payload.targetUserId ?? DEFAULT_USER_ID);
         if (Number.isFinite(targetUserId) && targetUserId !== DEFAULT_USER_ID) {
+          // GamePlay.getWorld (GamePlay.java:120-141): another targetUserId is a read-only visit (mUniverseOwner=false).
           const playerProfile = getUniverseProfile(playerUniverse);
           const bossGenre = Number(playerProfile?.bossGenre ?? 0);
           const neighborUniverse = createNeighborUniverse(targetUserId, bossGenre);
@@ -154,10 +229,20 @@ export class CommandService {
           if (savedNeighborUniverse) {
             return savedNeighborUniverse;
           }
+          // Unknown id: never hand back the local player's own world (the client would treat it as a visit).
+          return createVisitorNeighborUniverse(targetUserId);
         }
-        return isCollectibleFeatureUnlocked(getUniverseProfile(playerUniverse))
+        this.persistExpiredServices(userId, playerUniverse);
+        const projected = isCollectibleFeatureUnlocked(getUniverseProfile(playerUniverse))
           ? projectPendingCollectiblesOnUniverse(playerUniverse, collectiblesDocument)
           : playerUniverse;
+        // "Proccess Time-Services" (GamePlay.java:190-212): expose <sku>TimeLeft to the client without persisting it.
+        const output = JSON.parse(JSON.stringify(projected)) as JsonObject;
+        const outputProfile = getUniverseProfile(output);
+        if (outputProfile) {
+          projectServiceTimes(outputProfile, Date.now());
+        }
+        return output;
       }
       case "get_customizer_info":
         return this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.customizer);
@@ -183,14 +268,26 @@ export class CommandService {
         return this.getNormalizedCollectiblesDocument(userId);
       case "get_friends_collectible_sents_list":
         return this.getNormalizedCollectiblePendingDocument(userId);
-      case "get_daily_rewards_info":
-        return this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.dailyBonus);
+      case "get_daily_rewards_info": {
+        // GamePlay.getDailyRewardsInfo (GamePlay.java:899-957)
+        const dailyDocument = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.dailyBonus);
+        const refresh = refreshDailyRewardsInfo(dailyDocument, Date.now());
+        if (refresh.changed) {
+          this.repository.setDocument(userId, SAVE_TAGS.dailyBonus, dailyDocument);
+        }
+        const dailyAnswer = refresh.reset ? { ...dailyDocument, dailyRewardsCount: "1" } : dailyDocument;
+        // GamePlay.java:953: after a streak reset (stored 0) the answer carries count 1.
+        return dailyAnswer;
+      }
       case "get_partners_list":
         return this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.partners);
-      case "get_welcome_progress":
-        return this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.welcome);
+      case "get_welcome_progress": {
+        // GamePlay.getWelcomeProgress (GamePlay.java:972-986): both NPC timers = max(0, daily_bonus_at - now).
+        const left = String(Math.max(0, (Number(this.repository.getMeta(`daily_bonus_at_${userId}`)) || 0) - Date.now()));
+        return { ...this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.welcome), npcRonaldTimeLeft: left, npcCindyTimeLeft: left };
+      }
       case "get_investments_list":
-        return this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.investments);
+        return this.getInvestmentsDocument(userId);
       case "get_game_config":
         return this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.gameConfig);
       case "load_success":
@@ -228,13 +325,10 @@ export class CommandService {
         this.applyPollManagerMutation(userId, payload);
         break;
       case "update_daily_reward":
-        this.repository.setDocument(userId, SAVE_TAGS.dailyBonus, {
-          dailyBonusInfo: [],
-          dailyRewardsCount: String(Number(payload.dailyRewardsCount ?? 1)),
-          dailyRewardsLastGiven: String(payload.dailyRewardsLastGiven ?? ""),
-          dailyRewardsLastGivenDate: String(payload.dailyRewardsLastGivenDate ?? Date.now()),
-          dailyRewardsNextRewardId: String(payload.dailyRewardsNextRewardId ?? "")
-        });
+        this.applyDailyRewardMutation(userId, payload);
+        break;
+      case "update_next_rent":
+        this.applyNextRentMutation(userId, payload);
         break;
       default:
         break;
@@ -256,30 +350,175 @@ export class CommandService {
   }
 
   private handleNoopCommand(userId: number, command: PacketCommand): PacketCommand {
-    let response: JsonObject = {
-      success: "true",
-      unavailableOffline: "1"
-    };
+    const payload = (command._dat ?? {}) as Record<string, unknown>;
+    let response: JsonObject = { success: "true" };
 
     if (command._cmd === "ask_for_help" || command._cmd === "ask_for_cash") {
-      response = {
-        help_id: "null",
-        time_passed: "0",
-        time_total: "0",
-        unavailableOffline: "1"
-      };
+      // GamePlay.helpAccelerate (GamePlay.java:1105-1133) answers {help_id}. Offline there is nobody to post to, so the
+      // client gets help_id "null" (UserDataFacadeOnline.as ask_for_help/ask_for_cash -> info popup, no feed post).
+      response = { help_id: "null", time_passed: "0", time_total: "0" };
     } else if (command._cmd.startsWith("invest_")) {
-      response = {
-        success: "false",
-        unavailableOffline: "1"
-      };
+      response = this.handleInvestCommand(userId, command._cmd, payload);
+    } else if (command._cmd === "postReward") {
+      // GamePlay.rewardPost (GamePlay.java:2662-2718) returns the post counter; there is no feed offline.
+      response = { postCount: 0 };
     }
 
+    this.repository.incrementSessionSync(userId);
     return {
       _cmd: command._cmd,
       _dat: response,
       _sync: this.repository.getSession(userId)?.sync ?? DEFAULT_SYNC
     };
+  }
+
+  /** invest_* (GamePlay.java:1135-1284) against the investments list document, with auto-accepting offline friends. */
+  private handleInvestCommand(userId: number, cmd: string, payload: Record<string, unknown>): JsonObject {
+    const doc = this.getInvestmentsDocument(userId);
+    const children = getElementChildren(doc, "investmentsList");
+    const extId = String(payload.fExtId ?? "");
+    const now = Date.now();
+    const profile = getUniverseProfile(this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.universe));
+    switch (cmd) {
+      case "invest_on_friend": {
+        const coins = Number(profile?.DCCoins ?? "0");
+        if (extId.length === 0 || findInvestment(doc, extId) || coins < INVEST.inversion) {
+          return { id: "null" };
+        }
+        const id = String(now);
+        // Original creates state 1 (waiting for the friend to accept); the offline friend accepts at once (inferred).
+        children.push(
+          createElement(
+            "investment",
+            {
+              extId,
+              userId: "-1",
+              value: "0",
+              time: String(INVEST.timeMs),
+              remindTime: "0",
+              state: "2",
+              startedAt: String(now),
+              id
+            },
+            []
+          )
+        );
+        this.repository.setDocument(userId, SAVE_TAGS.investments, doc);
+        return { id };
+      }
+      case "invest_on_friend_reminder": {
+        const entry = findInvestment(doc, extId);
+        if (!entry) {
+          return { id: "null" };
+        }
+        entry.updatedAt = String(now);
+        this.repository.setDocument(userId, SAVE_TAGS.investments, doc);
+        return { id: String(entry.id ?? "0") };
+      }
+      case "invest_get_inversion":
+        // Nobody can invest in the local player offline (original looks for an investor row with state 1).
+        return { success: "false" };
+      case "invest_cancel": {
+        const entry = findInvestment(doc, extId);
+        if (!entry || Number(entry.state ?? "1") >= 3) {
+          return { success: "false" };
+        }
+        children.splice(children.indexOf(entry), 1);
+        this.repository.setDocument(userId, SAVE_TAGS.investments, doc);
+        return { success: "true" };
+      }
+      case "invest_results": {
+        const entry = findInvestment(doc, extId);
+        if (!entry || Number(entry.state ?? "0") !== 3) {
+          return { success: "false" };
+        }
+        const succeeded = Number(entry.value ?? "0") >= INVEST.target;
+        entry.state = succeeded ? "10" : "11";
+        if (succeeded) {
+          doc.investmentsRewarded = String(Number(doc.investmentsRewarded ?? "0") + 1);
+        }
+        this.repository.setDocument(userId, SAVE_TAGS.investments, doc);
+        // Coins/cash are granted by the client (InvestDefinitionManager.giveReward) and persisted by its next snapshot.
+        return { success: succeeded ? "true" : "false" };
+      }
+      default:
+        return { success: "false" };
+    }
+  }
+
+  /** get_investments_list (GamePlay.java:610-695): advance finished investments and hide state >= 10. */
+  private getInvestmentsDocument(userId: number): JsonObject {
+    const doc = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.investments);
+    if (refreshInvestments(doc, Date.now())) {
+      this.repository.setDocument(userId, SAVE_TAGS.investments, doc);
+    }
+    const started = doc.investmentsStarted ?? "0";
+    const rewarded = doc.investmentsRewarded ?? "0";
+    const visible = (getElementChildren(doc, "investmentsList") as JsonObject[]).filter(
+      (entry) => Number((entry as JsonObject).state ?? "1") < 10
+    );
+    return { ...doc, investmentsStarted: String(started), investmentsRewarded: String(rewarded), investmentsList: visible };
+  }
+
+  private applyDailyRewardMutation(userId: number, payload: Record<string, unknown>): void {
+    // GamePlay.updateDailyReward (GamePlay.java:1787-1834). The original rejects (SecurityFail) a claim when no reward is
+    // due or the sku does not belong to the day's group; the offline server accepts any known sku instead.
+    const sku = String(payload.sku ?? "");
+    const doc = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.dailyBonus);
+    applyDailyRewardGiven(doc, sku, Date.now());
+    this.repository.setDocument(userId, SAVE_TAGS.dailyBonus, doc);
+
+    const universe = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.universe);
+    const profile = getUniverseProfile(universe);
+    const security = toRecord(payload.security);
+    if (profile && hasMoneySecuritySnapshot(security)) {
+      applyMoneySecuritySnapshotWithPositiveDeltaFallback(profile, security);
+      this.repository.setDocument(userId, SAVE_TAGS.universe, universe);
+    } else if (profile) {
+      const def = getDailyRewardDefinition(sku);
+      const value = Number(def?.bonusValue ?? "0");
+      if (def && Number.isFinite(value)) {
+        addToProfile(profile, def.bonusType === "exp" ? "exp" : def.bonusType === "cash" ? "DCCash" : "DCCoins", def.bonusType === "item" ? 0 : value);
+        this.repository.setDocument(userId, SAVE_TAGS.universe, universe);
+      }
+    }
+
+    // The client stores an item reward in its vault (DailyBonusManager.keepDailyBonus) and sends it as security.item.
+    const item = security?.item;
+    if (typeof item === "string" && item.length > 0 && item !== "null") {
+      const storage = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.storage);
+      adjustStorage(storage, item, 1);
+      this.repository.setDocument(userId, SAVE_TAGS.storage, storage);
+    }
+  }
+
+  private applyNextRentMutation(userId: number, payload: Record<string, unknown>): void {
+    // GamePlay.updateNextRent (GamePlay.java:2720-2737): -1/0 stored as is, 1..259200 s stored as an absolute timestamp.
+    const seconds = Number(payload.next_rent);
+    if (!Number.isFinite(seconds) || seconds < -1 || seconds > 259200) {
+      return;
+    }
+    const value = seconds === 0 || seconds === -1 ? seconds : Date.now() + seconds * 1000;
+    this.repository.setMeta(`next_rent_${userId}`, String(value));
+  }
+
+  /** Drops expired `<sku>TimeOver` profile attributes (GamePlay.java:196-205). */
+  private persistExpiredServices(userId: number, universe: JsonObject): void {
+    const profile = getUniverseProfile(universe);
+    if (!profile) {
+      return;
+    }
+    const now = Date.now();
+    let changed = false;
+    for (const name of Object.keys(profile)) {
+      if (name.endsWith("TimeOver") && Number(profile[name]) - now < 0) {
+        delete profile[name];
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.repository.setDocument(userId, SAVE_TAGS.universe, universe);
+    }
   }
 
   private handleUpgradeCommand(userId: number, command: PacketCommand): PacketCommand {
@@ -295,6 +534,10 @@ export class CommandService {
   private handleCollectibleCommand(userId: number, command: PacketCommand): PacketCommand {
     const payload = command._dat as Record<string, unknown>;
     const action = String(payload.action ?? "").toUpperCase();
+
+    if (command._cmd === "ask_collectible" || action === "ASK") {
+      this.applyCollectibleAskMutation(userId, payload);
+    }
 
     if (command._cmd === "update_collectible") {
       switch (action) {
@@ -414,6 +657,14 @@ export class CommandService {
 
     setStoredUpgradeRecords(upgradesDocument, records);
     this.repository.setDocument(userId, SAVE_TAGS.upgrades, upgradesDocument);
+
+    // SecurityNormal.upgradeAdd (SecurityNormal.java:691-702): the visitor earns exp/coins (security snapshot from the client).
+    const security = toRecord(payload.security);
+    const visitorProfile = getUniverseProfile(playerUniverse);
+    if (visitorProfile && hasMoneySecuritySnapshot(security)) {
+      applyPositiveMoneySecurityDeltas(visitorProfile, security);
+      this.repository.setDocument(userId, SAVE_TAGS.universe, playerUniverse);
+    }
   }
 
   private applyProfileMutation(userId: number, payload: Record<string, unknown>): void {
@@ -451,6 +702,7 @@ export class CommandService {
         this.applyGameConfigProfileMutation(userId, payload);
         break;
       case "tutorial_completed":
+        // GamePlay.java:1993-1998
         profile.tutorialEnd = "1";
         normalizeCompletedTutorialUniverse(universe);
         break;
@@ -485,6 +737,24 @@ export class CommandService {
       case "million_news_feed":
         profile.millionNewsFeed = String(value ?? "1");
         break;
+      case "newItemsRev":
+      case "newItemsRevDone":
+        // GamePlay.java:2024-2027 (action "newItemsRev"; the 0.501 client sends "newItemsRevDone", Profile.as:810).
+        profile.newItemsRev = NEW_ITEMS_REV;
+        break;
+      case "service":
+        // GamePlay.java:2037-2043
+        applyServicePresentationShown(profile, String(value ?? ""));
+        break;
+      case "flag":
+        // GamePlay.java:2054-2087
+        applyProfileFlag(profile, String(payload.name ?? ""), String(payload.value ?? ""));
+        break;
+      case "restart_tutorial":
+        // Not in the original (it only offers the admin task "reset_universe", Server.java externalRequest). Opt-in
+        // way to replay the real tutorial: back up, then reseed a fresh save (premium currency is carried over).
+        this.repository.restartTutorial(userId);
+        return;
       default:
         break;
     }
@@ -534,6 +804,7 @@ export class CommandService {
       default:
         break;
     }
+    this.applyMoneyAction(userId, action, payload, universe, profile, hasMoneySecuritySnapshot(security));
 
     for (const [key, value] of Object.entries(payload)) {
       if (value == null) {
@@ -561,6 +832,140 @@ export class CommandService {
     });
 
     this.repository.setDocument(userId, SAVE_TAGS.universe, universe);
+  }
+
+  /**
+   * Non-snapshot effects of update_money actions (GamePlay.updateMoney, GamePlay.java:2089-2303). The client always sends
+   * the absolute security snapshot, which stays the source of truth for coins/exp/cash; when it is missing the original
+   * server-computed deltas (SecurityNormal.updateMoney :72-135) are applied instead.
+   */
+  private applyMoneyAction(
+    userId: number,
+    action: string,
+    payload: Record<string, unknown>,
+    universe: JsonObject,
+    profile: MutableNode,
+    hasSnapshot: boolean
+  ): void {
+    const level = levelFromExp(Number(profile.exp ?? "0") || 0);
+    switch (action) {
+      case "exchange": {
+        // Cash -> coins at settings cashToCoins (SecurityNormal.java:84-90).
+        const golds = Number(payload.value ?? 0);
+        if (!hasSnapshot && Number.isFinite(golds) && golds > 0 && Number(profile.DCCash ?? "0") >= golds) {
+          addToProfile(profile, "DCCash", -golds);
+          addToProfile(profile, "DCCoins", golds * CASH_TO_COINS);
+        }
+        break;
+      }
+      case "unlockItem": {
+        // GamePlay.java:2186-2248: early_unlocked_items list; price comes from the client snapshot.
+        const sku = String(payload.value ?? "");
+        if (sku.length > 0) {
+          const document = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.unlocked);
+          if (addUnlockedItem(document, sku)) {
+            this.repository.setDocument(userId, SAVE_TAGS.unlocked, document);
+          }
+        }
+        break;
+      }
+      case "service": {
+        // GamePlay.java:2142-2183 (profile `<sku>TimeOver`, prices SecurityNormal.java:96-107).
+        const sku = String(payload.value ?? "");
+        const contractId = Number(payload.id ?? 0);
+        if (applyServicePurchase(profile, sku, contractId, Date.now()) && !hasSnapshot) {
+          const def = getServiceDefinition(sku, contractId);
+          const offer = Number(payload.offer ?? 0) === 1;
+          if (def) {
+            addToProfile(profile, "DCCoins", -(offer ? def.offerPriceCoins : def.priceCoins));
+            addToProfile(profile, "DCCash", -(offer ? def.offerPriceCash : def.priceCash));
+          }
+        }
+        break;
+      }
+      case "reward": {
+        // The original marks a feed reward id as accepted (needs Facebook posts); only the grant is relevant offline.
+        if (!hasSnapshot) {
+          const reward = newsFeedReward(String(payload.value ?? ""));
+          addToProfile(profile, "exp", reward.exp);
+          addToProfile(profile, "DCCoins", reward.coins);
+          addToProfile(profile, "DCCash", reward.cash);
+        }
+        break;
+      }
+      case "openBox":
+      case "briefcase": {
+        // Not handled by the archived server except "briefcase" (GamePlay.updateFreeGifts :1410-1494, which consumes one
+        // box from storage and adds "move" prizes). openBox is the 0.501 client's generalisation (FreeGiftDefinitionManager.as:83).
+        const prize = getBoxPrize(String(payload.prize ?? ""));
+        const storage = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.storage);
+        let storageChanged = false;
+        const type = String(payload.type ?? prize?.type ?? "");
+        const value = String(payload.value ?? prize?.value ?? "");
+        if (prize) {
+          storageChanged = adjustStorage(storage, prize.box, -1) || storageChanged;
+        }
+        if (type === "move") {
+          storageChanged = adjustStorage(storage, "move", Number(value) || 0) || storageChanged;
+        } else if (type === "item" && value.length > 0) {
+          storageChanged = adjustStorage(storage, value, 1) || storageChanged;
+        } else if (!hasSnapshot) {
+          // FreeGiftDefinitionManager.openBox :41-55 (cash scales with level; exp percent is inferred as % of the level span).
+          if (type === "cash") {
+            addToProfile(profile, "DCCoins", (Number(value) || 0) * level);
+          } else if (type === "gold") {
+            addToProfile(profile, "DCCash", Number(value) || 0);
+          }
+        }
+        if (storageChanged) {
+          this.repository.setDocument(userId, SAVE_TAGS.storage, storage);
+        }
+        break;
+      }
+      case "rentAccelerator": {
+        // ToolRentAccelerator.as:48-58: one accelerator leaves the vault and the house is flagged accelerated.
+        const accelerator = getAcceleratorStorage(String(payload.sku ?? ""));
+        if (accelerator) {
+          const storage = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.storage);
+          if (adjustStorage(storage, accelerator.storageSku, -1)) {
+            this.repository.setDocument(userId, SAVE_TAGS.storage, storage);
+          }
+        }
+        this.applyRentAccelerator(universe, String(payload.itemSid ?? ""), accelerator?.percent ?? 0);
+        break;
+      }
+      case "dailyBonusDone": {
+        // GamePlay.java:2127-2141: daily_bonus_at = now + Settings.smDailyBonusTime.
+        this.repository.setMeta(`daily_bonus_at_${userId}`, String(Date.now() + DAILY_BONUS_TIME_MS));
+        // SecurityNormal.java:91: coinsGain = smDailyBonusCoins * 4 (settings dailyBonus=5000 -> 20000).
+        if (!hasSnapshot) addToProfile(profile, "DCCoins", DAILY_BONUS_COINS * 4);
+        break;
+      }
+      default:
+        // buyGold / buy_bundle: payments are free offline and granted by reconcilePremiumCurrencyPurchase (buyGold) or
+        // by the client-side snapshot (buy_bundle, no original counterpart); dailyBonusDone/first_visit need nothing more.
+        break;
+    }
+  }
+
+  /** StateOnRent.accelerateIncomeTime (StateOnRent.as:1817-1830): cut `percent` of the max income time, flag accelerated. */
+  private applyRentAccelerator(universe: JsonObject, sid: string, percent: number): void {
+    if (sid.length === 0) {
+      return;
+    }
+    const existing = findItemEntry(universe, sid);
+    const state = existing ? findElementChild(getElementChildren(existing.itemEntry, "Item"), "State") : undefined;
+    if (!state || String(state.id ?? "") !== "1" || String(state.mode ?? "") !== "4" || String(state.accelerated ?? "") === "1") {
+      return;
+    }
+    state.accelerated = "1";
+    const time = Number(state.time ?? "0");
+    const contractSku = String(state.contractSku ?? "");
+    const maxTime = getContractIncomeTimeMs(contractSku);
+    if (Number.isFinite(time) && maxTime > 0 && percent > 0) {
+      state.time = String(Math.max(0, time - Math.trunc((maxTime * percent) / 100)));
+      state.savedAt = String(Date.now());
+    }
   }
 
   private getNormalizedCollectiblesDocument(userId: number): JsonObject {
@@ -600,7 +1005,11 @@ export class CommandService {
       changed = true;
     }
 
-    collectibleState.objectCounts.set(sku, (collectibleState.objectCounts.get(sku) ?? 0) + 1);
+    // KEEP/BUY refuse a 100th unit (GamePlay.java:1595-1603); the pending entry is still consumed.
+    const keptUnits = collectibleState.objectCounts.get(sku) ?? 0;
+    if (keptUnits < MAX_COLLECTIBLE_UNITS) {
+      collectibleState.objectCounts.set(sku, keptUnits + 1);
+    }
     changed = true;
 
     if (changed) {
@@ -617,35 +1026,76 @@ export class CommandService {
 
     const collectiblesDocument = this.getNormalizedCollectiblesDocument(userId);
     const collectibleState = readCollectiblesState(collectiblesDocument);
-    collectibleState.objectCounts.set(sku, (collectibleState.objectCounts.get(sku) ?? 0) + 1);
+    const boughtUnits = collectibleState.objectCounts.get(sku) ?? 0;
+    if (boughtUnits >= MAX_COLLECTIBLE_UNITS) {
+      return; // GamePlay.java:1685-1688
+    }
+    collectibleState.objectCounts.set(sku, boughtUnits + 1);
     writeCollectiblesState(collectiblesDocument, collectibleState);
     this.repository.setDocument(userId, SAVE_TAGS.collectibles, collectiblesDocument);
   }
 
+  /**
+   * SELL (GamePlay.java:1700-1710): sells a *pending* collectible (house sid, or "f<sender>" for a friend gift), so only the
+   * pending entry disappears; the coin reward arrives through the security snapshot. Owned counts are untouched.
+   */
   private applyCollectibleSellMutation(userId: number, payload: Record<string, unknown>): void {
+    const sid = String(payload.sid ?? "");
     const sku = String(payload.sku ?? "");
-    if (sku.length === 0) {
+    if (sid.startsWith("f")) {
+      const pendingDocument = this.getNormalizedCollectiblePendingDocument(userId);
+      if (removePendingFriendCollectible(pendingDocument, sid.slice(1), sku)) {
+        this.repository.setDocument(userId, SAVE_TAGS.collectiblePending, pendingDocument);
+      }
       return;
     }
 
     const collectiblesDocument = this.getNormalizedCollectiblesDocument(userId);
     const collectibleState = readCollectiblesState(collectiblesDocument);
-    const currentCount = collectibleState.objectCounts.get(sku) ?? 0;
-    if (currentCount <= 0) {
-      return;
+    if (collectibleState.pendingBySid.delete(sid)) {
+      writeCollectiblesState(collectiblesDocument, collectibleState);
+      this.repository.setDocument(userId, SAVE_TAGS.collectibles, collectiblesDocument);
     }
-
-    if (currentCount === 1) {
-      collectibleState.objectCounts.delete(sku);
-    } else {
-      collectibleState.objectCounts.set(sku, currentCount - 1);
-    }
-    writeCollectiblesState(collectiblesDocument, collectibleState);
-    this.repository.setDocument(userId, SAVE_TAGS.collectibles, collectiblesDocument);
   }
 
+  /**
+   * SEND (GamePlay.java:1648-1676). From the vault ("v") the original leaves the stored counts alone; offline nobody receives
+   * the gift, so the sent unit is removed from the vault (inferred). A pending sid is moved into the owned list like KEEP.
+   */
   private applyCollectibleSendMutation(userId: number, payload: Record<string, unknown>): void {
-    this.applyCollectibleSellMutation(userId, payload);
+    const sid = String(payload.sid ?? "");
+    const sku = String(payload.sku ?? "");
+    if (sid.startsWith("v")) {
+      const document = this.getNormalizedCollectiblesDocument(userId);
+      const state = readCollectiblesState(document);
+      const count = state.objectCounts.get(sku) ?? 0;
+      if (count <= 0) {
+        return;
+      }
+      if (count === 1) {
+        state.objectCounts.delete(sku);
+      } else {
+        state.objectCounts.set(sku, count - 1);
+      }
+      writeCollectiblesState(document, state);
+      this.repository.setDocument(userId, SAVE_TAGS.collectibles, document);
+      return;
+    }
+    if (sid.startsWith("f") || sid.length === 0 || sku.length === 0) {
+      return;
+    }
+    this.applyCollectibleKeepMutation(userId, payload);
+  }
+
+  /** ASK: remember the requested collectible (UserData.mLastCollectiblesAsked); stored as `asked` on the collectibles list. */
+  private applyCollectibleAskMutation(userId: number, payload: Record<string, unknown>): void {
+    const sku = String(payload.sku ?? "");
+    if (sku.length === 0) {
+      return;
+    }
+    const document = this.getNormalizedCollectiblesDocument(userId);
+    document.asked = pushAskedCollectible(String(document.asked ?? ""), sku);
+    this.repository.setDocument(userId, SAVE_TAGS.collectibles, document);
   }
 
   private applyCollectibleRewardMutation(userId: number, payload: Record<string, unknown>): void {
@@ -656,6 +1106,21 @@ export class CommandService {
 
     const collectiblesDocument = this.getNormalizedCollectiblesDocument(userId);
     const collectibleState = readCollectiblesState(collectiblesDocument);
+    if (!collectibleState.rewards.has(sku)) {
+      // Tradeable groups consume one unit of each member (GamePlay.java:1719-1746; the original throws if one is missing,
+      // the offline server only consumes when the whole set is owned).
+      const members = getTradeInCollectibleSkus(sku);
+      if (members.length > 0 && members.every((member) => (collectibleState.objectCounts.get(member) ?? 0) > 0)) {
+        for (const member of members) {
+          const count = (collectibleState.objectCounts.get(member) ?? 0) - 1;
+          if (count <= 0) {
+            collectibleState.objectCounts.delete(member);
+          } else {
+            collectibleState.objectCounts.set(member, count);
+          }
+        }
+      }
+    }
     collectibleState.rewards.add(sku);
     writeCollectiblesState(collectiblesDocument, collectibleState);
     this.repository.setDocument(userId, SAVE_TAGS.collectibles, collectiblesDocument);
@@ -778,6 +1243,9 @@ export class CommandService {
       return [];
     }
 
+    this.applyItemStorageEffects(userId, payload, action, incomingItem);
+    this.applyUpgradeAppliedEffect(userId, payload, sid);
+
     const existing = findItemEntry(universe, sid);
     const beforeSignature = existing ? getItemMutationSignature(existing.itemEntry) : "";
 
@@ -843,6 +1311,9 @@ export class CommandService {
     itemEntry.csid = String(companyEntry.sid ?? payload.csid ?? "1");
 
     const existingState = findElementChild(itemChildren, "State");
+    const previousStored = existing ? findElementChild(getElementChildren(existing.itemEntry, "Item"), "State") : undefined;
+    const previousMode = String(previousStored?.mode ?? "");
+    const previousStateId = String(previousStored?.id ?? "");
 
     if (typeof itemEntry.sku === "string" && itemEntry.sku === "HeadQuarter") {
       ensureStateElement(itemChildren, { id: "4" });
@@ -868,6 +1339,21 @@ export class CommandService {
       getElementChildren(companyEntry, "Company").push(itemEntry);
     }
 
+    if (action === "buy_crew") {
+      // Persist <Crew ids bought/> on the item (ItemObject.getPersistence :2392); the original Java server has no handler.
+      const crewEntry = getOrCreateElementChild(itemChildren, "Crew");
+      const bought = new Set(String(crewEntry.bought ?? "").split(",").filter((entry) => entry.length > 0));
+      for (const position of String(payload.position ?? "").split(",")) {
+        if (/^\d+$/.test(position.trim())) {
+          bought.add(position.trim());
+        }
+      }
+      crewEntry.bought = Array.from(bought).sort((a, b) => Number(a) - Number(b)).join(",");
+      crewEntry.ids = String(crewEntry.ids ?? "");
+    }
+
+    const doubleRentPush = this.rollDoubleRent(userId, universe, itemEntry, payload, previousStateId, previousMode);
+
     const itemState = findElementChild(itemChildren, "State");
     if (itemState && String(itemState.id ?? "") === "0") {
       normalizeConstructionState(String(itemEntry.sku ?? ""), itemState, Date.now());
@@ -883,12 +1369,51 @@ export class CommandService {
     if (
       profile &&
       hasMoneySecuritySnapshot(security) &&
-      (!existing || beforeSignature !== getItemMutationSignature(itemEntry))
+      (!existing || action === "buy_crew" || beforeSignature !== getItemMutationSignature(itemEntry))
     ) {
       applyMoneySecuritySnapshotWithPositiveDeltaFallback(profile, security);
     }
     this.repository.setDocument(userId, SAVE_TAGS.universe, universe);
-    return collectibleSideEffects;
+    return doubleRentPush ? [...collectibleSideEffects, doubleRentPush] : collectibleSideEffects;
+  }
+
+  /**
+   * Vault side effects of update_item: new_item with `storage` consumes one stored item (SecurityNormal.java:206-221) and a
+   * move with `freeMove` consumes one stored "move" (SecurityNormal.java:265-290).
+   */
+  private applyItemStorageEffects(
+    userId: number,
+    payload: Record<string, unknown>,
+    action: string,
+    incomingItem: MutableNode | undefined
+  ): void {
+    let sku: string | undefined;
+    if (action === "new_item" && nonEmptyString(payload.storage) !== undefined) {
+      sku = nonEmptyString(payload.sku) ?? nonEmptyString(incomingItem?.sku);
+    } else if (action === "move" && payload.freeMove != null && String(payload.freeMove) !== "") {
+      sku = "move";
+    }
+    if (!sku) {
+      return;
+    }
+    const storage = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.storage);
+    if (adjustStorage(storage, sku, -1)) {
+      this.repository.setDocument(userId, SAVE_TAGS.storage, storage);
+    }
+  }
+
+  /** new_mode with upgradeType: GamePlay.upgradeRem marks the visitor upgrades of the item as applied (GamePlay.java:2487-2489, 1340-1344). */
+  private applyUpgradeAppliedEffect(userId: number, payload: Record<string, unknown>, sid: string): void {
+    if (String(payload.action ?? "").toLowerCase() !== "new_mode" || payload.upgradeType == null) {
+      return;
+    }
+    const upgradesDocument = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.upgrades);
+    const records = getStoredUpgradeRecords(upgradesDocument);
+    const remaining = records.filter((record) => !(record.ownerId === String(DEFAULT_USER_ID) && record.sid === sid));
+    if (remaining.length !== records.length) {
+      setStoredUpgradeRecords(upgradesDocument, remaining);
+      this.repository.setDocument(userId, SAVE_TAGS.upgrades, upgradesDocument);
+    }
   }
 
   private applyMapMutation(userId: number, payload: Record<string, unknown>): void {
@@ -984,31 +1509,39 @@ export class CommandService {
       return;
     }
 
+    // GamePlay.updateMissions (GamePlay.java:1346-1389): not in any list -> Up -> Reached -> Given; the reward is paid
+    // only on Reached -> Given (SecurityNormal.java:535-545, amounts from missionDefinitions.xml).
     const security = toRecord(payload.security);
     const missionsEntry = getOrCreateElementChild(profileChildren, "Missions");
     const missionChildren = getElementChildren(missionsEntry, "Missions");
     const up = parseChunkSet(findElementChild(missionChildren, "Up"));
     const reached = parseChunkSet(findElementChild(missionChildren, "Reached"));
     const given = parseChunkSet(findElementChild(missionChildren, "Given"));
-    const wasGiven = given.has(sku);
-    const shouldClaimReward = !wasGiven && (reached.has(sku) || hasNegativeSecurityDelta(security));
-
-    up.delete(sku);
-    if (wasGiven) {
-      reached.delete(sku);
-    } else if (shouldClaimReward) {
-      reached.delete(sku);
-      given.add(sku);
-    } else {
-      reached.add(sku);
-    }
+    const missionAltReward = Number(String(profile.flags ?? "").split(",").find((flag) => flag.startsWith("missionAltReward:"))?.split(":")[1] ?? 0);
+    const reward = reached.has(sku) && !given.has(sku) ? getMissionReward(sku, missionAltReward) : undefined;
+    const { rewarded } = stepMission(up, reached, given, sku);
 
     upsertChunkElement(missionChildren, "Up", up);
     upsertChunkElement(missionChildren, "Reached", reached);
     upsertChunkElement(missionChildren, "Given", given);
 
-    if (shouldClaimReward) {
-      applyPositiveMoneySecurityDeltas(profile, security);
+    if (rewarded && reward) {
+      // The client pays the reward first and then sends a snapshot of the already-paid balances (expNow/coinsNow/cashNow).
+      // Never double: the final balance is max(snapshot, before + reward), so a snapshot that includes the reward wins
+      // and a missing/stale one is topped up. Reload therefore neither loses nor doubles it.
+      const before = { exp: Number(profile.exp ?? "0") || 0, DCCoins: Number(profile.DCCoins ?? "0") || 0, DCCash: Number(profile.DCCash ?? "0") || 0 };
+      const target = { exp: before.exp + reward.exp, DCCoins: before.DCCoins + reward.coins, DCCash: before.DCCash + reward.cash };
+      const now = { exp: Number(security?.expNow), DCCoins: Number(security?.coinsNow), DCCash: Number(security?.cashNow) };
+      for (const key of ["exp", "DCCoins", "DCCash"] as const) {
+        profile[key] = String(Number.isFinite(now[key]) ? Math.max(now[key], target[key]) : target[key]);
+      }
+      if (reward.items.length > 0) {
+        const storage = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.storage);
+        for (const item of reward.items) {
+          adjustStorage(storage, item.sku, item.amount || 1);
+        }
+        this.repository.setDocument(userId, SAVE_TAGS.storage, storage);
+      }
     }
 
     this.repository.setDocument(userId, SAVE_TAGS.universe, universe);
@@ -1103,4 +1636,32 @@ function parseCheckmailState(value: unknown): number {
   }
 
   return Math.min(2, Math.max(0, Math.trunc(parsed)));
+}
+
+const WONDER_INCOME_MULTIPLIER_HOUSES = new Map<string, number>(
+  loadDefinitionAttributes(path.join(RULES_ROOT, "wonderDefinitions.xml"))
+    .filter((def) => def.subtype === "incomeMultiplier" && def.target === "Houses")
+    .map((def) => [def.sku ?? "", Math.trunc(Number(def.incomeValue ?? "0")) || 0] as [string, number])
+);
+
+/** Sum of incomeValue of the player's fully built (State id 5) incomeMultiplier wonders targeting Houses. */
+function getDoubleRentHousesProbability(universe: JsonObject): number {
+  let total = 0;
+  const world = (universe.universe as MutableNode[] | undefined)?.find((entry) => Array.isArray(entry?.World));
+  for (const company of (world?.World as MutableNode[] | undefined) ?? []) {
+    if (!Array.isArray(company?.Company) || String(company.whose ?? "") !== "0") {
+      continue;
+    }
+    for (const item of company.Company as MutableNode[]) {
+      const value = WONDER_INCOME_MULTIPLIER_HOUSES.get(String(item?.sku ?? ""));
+      if (value === undefined || !Array.isArray(item.Item)) {
+        continue;
+      }
+      const state = findElementChild(item.Item as JsonObject[], "State");
+      if (state && String(state.id ?? "") === "5") {
+        total += value;
+      }
+    }
+  }
+  return total;
 }

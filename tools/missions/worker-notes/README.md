@@ -1,0 +1,1 @@
+One file per class (`C09.md` ...): what was run, the exact commands, `verify.py` output, remaining differences copied verbatim, and anything suspicious. Workers write here; the Lead reads here. Never put conclusions about "acceptable" differences here: the Lead decides in `tools/missions/accepted.json`.

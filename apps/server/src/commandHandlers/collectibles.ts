@@ -60,7 +60,17 @@ const COLLECTIBLE_HQ_REWARD_BY_GROUP = loadCollectibleRewardMapByType(
 const COLLECTIBLES_BY_CONTRACT_GROUP = groupCollectiblesByContractGroup(COLLECTIBLE_DEFINITIONS);
 const COLLECTIBLE_UNLOCK_LEVEL = loadCollectibleUnlockLevel(SETTINGS_PATH);
 const LEVEL_XP_THRESHOLDS = loadLevelXpThresholds(XP_TABLE_PATH);
-const HOUSE_COLLECTIBLE_DROP_DIVISOR = 8;
+// CollectiblesRules.getHasCollectibleByContractSku (CollectiblesRules.java:182-187): drop chance depends on the contract's
+// incomeTime (hours -> finalResult/100; table `collectibles_chances_definitions` of the original config row).
+export const COLLECTIBLE_CHANCE_BY_HOURS = new Map<number, number>([
+  [0.05, 1.25], [0.5, 2.5], [1, 3.75], [2, 5.625], [4, 3.75], [8, 6.6667], [12, 12.0833], [18, 14.5833], [24, 20.8333], [48, 13.75], [72, 13.75]
+].map(([h, c]) => [h, c / 100] as [number, number]));
+const CONTRACT_HOURS_BY_SKU = new Map(
+  loadDefinitionAttributes(path.join(RULES_ROOT, "contracts.xml")).map((d) => [String(d.sku), Number(d.incomeTime)] as [string, number])
+);
+export function collectibleDropChance(contractSku: string): number {
+  return COLLECTIBLE_CHANCE_BY_HOURS.get(CONTRACT_HOURS_BY_SKU.get(contractSku) ?? Number.NaN) ?? 0;
+}
 
 export function normalizeCollectiblesDocument(document: JsonObject): boolean {
   const normalized = createEmptyCollectiblesDocument();
@@ -224,8 +234,9 @@ export function shouldAwardCollectibleDrop(itemEntry: MutableNode, state: Mutabl
   }
 
   const cycleKey = `${sid}:${itemSku}:${contractSku}:${savedAt}`;
-  const roll = Math.abs(stableStringHash(cycleKey));
-  return roll % HOUSE_COLLECTIBLE_DROP_DIVISOR === 0;
+  // Deterministic stand-in for Math.random() (idempotent per rent cycle): Java awards when rand <= chance.
+  const roll = (Math.abs(stableStringHash(cycleKey)) % 100000) / 100000;
+  return roll <= collectibleDropChance(contractSku);
 }
 
 export function pickCollectibleSkuForHouse(itemSku: string, sid: string, state: CollectiblesState): string | undefined {
@@ -581,4 +592,27 @@ function groupCollectiblesByContractGroup(definitions: CollectibleDefinition[]):
     }
   }
   return mapping;
+}
+
+const RAW_COLLECTIBLE_GROUPS = loadDefinitionAttributes(path.join(RULES_ROOT, "collectiblesGroupsDefinitions.xml"));
+const RAW_COLLECTIBLES = loadDefinitionAttributes(path.join(RULES_ROOT, "collectiblesDefinitions.xml"));
+export const MAX_COLLECTIBLE_UNITS = 99; // GamePlay.java:1632-1637, Settings.smCollectibleMaxUnitsPerItem
+export const MAX_COLLECTIBLES_ASKED = 5; // UserData.MAX_GIFTS_ASKED (UserData.java:11)
+
+/**
+ * Collectible skus a "tradeable" (tradein="1") group consumes when its reward is claimed (GamePlay.java:1719-1746).
+ * Empty for non-tradeable groups.
+ */
+export function getTradeInCollectibleSkus(groupSku: string): string[] {
+  const group = RAW_COLLECTIBLE_GROUPS.find((entry) => entry.sku === groupSku);
+  if (group?.tradein !== "1") {
+    return [];
+  }
+  return RAW_COLLECTIBLES.filter((entry) => entry.collection === groupSku).map((entry) => String(entry.sku));
+}
+
+/** GamePlay.askForCollectibles (GamePlay.java:1387-1408): most-recent-first list, de-duplicated, capped at 5. */
+export function pushAskedCollectible(asked: string, sku: string): string {
+  const list = asked.split(",").filter((entry) => entry.length > 0 && entry !== sku);
+  return [sku, ...list].slice(0, MAX_COLLECTIBLES_ASKED).join(",");
 }

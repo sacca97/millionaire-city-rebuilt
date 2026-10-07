@@ -1,0 +1,6 @@
+{
+  "217": {"note": "alt checkInfluence mission without `amount` never progresses in the original either (hasTrigger = eventAmount > 0)", "citation": "decompiled missions/MissionDefinition.as:282-285; assets missionDefinitions.xml sku 217"},
+  "222": {"note": "same data quirk as 217", "citation": "MissionDefinition.as:282-285"},
+  "227": {"note": "same data quirk as 217", "citation": "MissionDefinition.as:282-285"},
+  "238": {"note": "same data quirk as 217", "citation": "MissionDefinition.as:282-285"}
+}

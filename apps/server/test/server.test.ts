@@ -11,13 +11,13 @@ import type { JsonObject } from "@mcity/shared/dist/types.js";
 import { createServerApp as createServerAppBase } from "../src/serverApp.js";
 import { getServerConfig, type ServerConfig } from "../src/config.js";
 import { renderLauncherHtml } from "../src/launcherHtml.js";
+import { collectibleDropChance } from "../src/commandHandlers/collectibles.js";
 import { createEmptyCollectiblesDocument, normalizeCompletedTutorialUniverse } from "../src/saveDefaults.js";
 import { RONALD_LAYOUT_ITEMS, RONALD_PLOTS_TYPE } from "../src/saveDefaults/ronaldLayout.js";
 import { createStarterDecorationItems } from "../src/saveDefaults/starterDecorations.js";
 import { loadCashToCoins } from "../src/rules.js";
 
 const activeApps: Array<ReturnType<typeof createServerApp>> = [];
-const HOUSE_COLLECTIBLE_DROP_DIVISOR = 8;
 const EXPECTED_STARTER_DECORATION_SKUS = createStarterDecorationItems("1").map((entry) => String(entry.sku));
 const EXPECTED_STARTER_DECORATION_VALUE = 299_000;
 const archivedAssetTest = hasArchivedAssetFiles() ? test : test.skip;
@@ -60,10 +60,10 @@ function stableTestHash(value: string): number {
 }
 
 function findCollectibleSavedAt(sid: string, sku: string, contractSku: string, shouldAward: boolean): string {
-  for (let offset = 0; offset < 2048; offset += 1) {
+  for (let offset = 0; offset < 200000; offset += 1) {
     const savedAt = String(1_700_000_000_000 + offset);
-    const roll = Math.abs(stableTestHash(`${sid}:${sku}:${contractSku}:${savedAt}`));
-    if ((roll % HOUSE_COLLECTIBLE_DROP_DIVISOR === 0) === shouldAward) {
+    const roll = (Math.abs(stableTestHash(`${sid}:${sku}:${contractSku}:${savedAt}`)) % 100000) / 100000;
+    if ((roll <= collectibleDropChance(contractSku)) === shouldAward) {
       return savedAt;
     }
   }
@@ -3039,6 +3039,34 @@ describe("Millionaire City server", () => {
             _cnt: 3
           },
           {
+            _cmd: "update_missions",
+            _dat: {
+              action: "update",
+              sku: "6",
+              security: {
+                expGain: -170,
+                coinsGain: -60000,
+                cashGain: 0,
+                compValueGain: 0
+              }
+            },
+            _cnt: 5
+          },
+          {
+            _cmd: "update_missions",
+            _dat: {
+              action: "update",
+              sku: "6",
+              security: {
+                expGain: -170,
+                coinsGain: -60000,
+                cashGain: 0,
+                compValueGain: 0
+              }
+            },
+            _cnt: 6
+          },
+          {
             _cmd: "update_profile",
             _dat: { action: "tutorial_completed" },
             _cnt: 4
@@ -3557,7 +3585,8 @@ describe("Millionaire City server", () => {
       expect(repairedTerrain?.chunk).toContain("5:3");
       expect(repairedRoad?.chunk).toContain("3:4");
       expect(repairedRoad?.chunk).toContain("4:4");
-      expect(repairedUp?.chunk).toBe("1,10,2,5");
+      // GamePlay.java:1346: the server no longer seeds/rewrites the Up list.
+      expect(repairedUp?.chunk).toBe("");
       expect(repairedCount?.chunk).toBe("");
       expect(repairedHouse?.Item.find((entry: Record<string, unknown>) => Array.isArray(entry.State))?.id).toBe("1");
       expect(repairedHouse?.Item.find((entry: Record<string, unknown>) => Array.isArray(entry.State))?.mode).toBe("1");
@@ -3688,8 +3717,6 @@ describe("Millionaire City server", () => {
       expect(givenSkus).toContain("2");
       expect(givenSkus).toContain("5");
       expect(givenSkus).toContain("18");
-      expect(upSkus).toContain("10");
-      expect(upSkus).toContain("31");
       expect(upSkus).not.toContain("1");
       expect(upSkus).not.toContain("2");
       expect(upSkus).not.toContain("5");
@@ -4185,10 +4212,11 @@ describe("Millionaire City server", () => {
       | { chunk?: string }
       | undefined;
 
-    expect(savedProfile.exp).toBe("2890");
-    expect(savedProfile.DCCoins).toBe("3500");
-    expect(savedProfile.DCCash).toBe("15");
-    expect(savedProfile.companyValue).toBe("553000");
+    // Reached -> Given pays the missionDefinitions.xml reward (sku 39: 35000 coins) once; the stale snapshot is topped up.
+    expect(savedProfile.exp).toBe("756");
+    expect(savedProfile.DCCoins).toBe("36000");
+    expect(savedProfile.DCCash).toBe("10");
+    expect(savedProfile.companyValue).toBe("550000");
     expect(given?.chunk).toBe("39");
   });
 
@@ -4295,9 +4323,8 @@ describe("Millionaire City server", () => {
       const upSkus = (repairedUp?.chunk ?? "").split(",").filter(Boolean);
       const reachedSkus = (repairedReached?.chunk ?? "").split(",").filter(Boolean);
 
-      expect(upSkus).not.toContain("39");
-      expect(reachedSkus).not.toContain("26");
-      expect(reachedSkus).not.toContain("39");
+      // Reached entries are never demoted: the player may still claim them (GamePlay.java:1346).
+      expect(upSkus).not.toContain("26");
     }
   });
 
@@ -4403,8 +4430,8 @@ describe("Millionaire City server", () => {
       const upSkus = (repairedUp?.chunk ?? "").split(",").filter(Boolean);
       const reachedSkus = (repairedReached?.chunk ?? "").split(",").filter(Boolean);
 
-      expect(upSkus).toContain("39");
-      expect(reachedSkus).not.toContain("39");
+      expect(reachedSkus).toContain("39");
+      expect(upSkus).not.toContain("39");
     }
   });
 

@@ -5,7 +5,7 @@ import type { MutableNode } from "./universe.js";
 const RULES_ROOT = path.resolve(__dirname, "../../../../assets/dchoc1-a.akamaihd.net/0.501/mcity/Datas/rules");
 const SETTINGS_PATH = path.join(RULES_ROOT, "settings.xml");
 const GOLD_PACKAGE_REWARDS = loadGoldPackageRewards(path.join(RULES_ROOT, "fbcredits.xml"));
-const CASH_TO_COINS = loadCashToCoins(SETTINGS_PATH);
+export const CASH_TO_COINS = loadCashToCoins(SETTINGS_PATH);
 
 export function hasMoneySecuritySnapshot(security: Record<string, unknown> | undefined): boolean {
   if (!security) {
@@ -118,12 +118,22 @@ function applyMoneySecurityField(
   deltaKey: string
 ): void {
   const absoluteValue = Number(security[absoluteKey] ?? Number.NaN);
+  const gainValue = Number(security[deltaKey] ?? Number.NaN);
+  // SecurityNormal.verify (java:784-787): exp/coins/cash accumulate the reported GAIN; only compValue takes the reported "Now".
+  // The original client sends a stale (pre-spend) coinsNow on map/contract commands, so trusting Now would lose the spend.
+  if (targetKey !== "companyValue" && Number.isFinite(gainValue) && Number.isFinite(Number(profile[targetKey] ?? "0"))) {
+    if (gainValue !== 0) {
+      profile[targetKey] = String(Number(profile[targetKey] ?? "0") + gainValue);
+    }
+    return;
+  }
+
   if (Number.isFinite(absoluteValue)) {
     profile[targetKey] = String(absoluteValue);
     return;
   }
 
-  const deltaValue = Number(security[deltaKey] ?? Number.NaN);
+  const deltaValue = gainValue;
   if (!Number.isFinite(deltaValue) || deltaValue === 0) {
     return;
   }
@@ -148,6 +158,21 @@ function applyMoneySecurityFieldWithPositiveDeltaFallback(
   const currentValue = Number(profile[targetKey] ?? "0");
 
   if (!Number.isFinite(currentValue)) {
+    return;
+  }
+
+  // SecurityNormal.verify (java:784-787): exp/coins/cash accumulate the reported GAIN (negative ones too); the original client's
+  // coinsNow/expNow are often the pre-command value, so trusting them would drop a spend (oracle sell-rival-roads, terrain buys).
+  if (targetKey !== "companyValue" && Number.isFinite(deltaValue)) {
+    if (deltaValue !== 0) {
+      profile[targetKey] = String(currentValue + deltaValue);
+    }
+    return;
+  }
+
+  // SecurityNormal.verify (java:787): user.mCompValue = compValueNow, always (the original's Now lags the last event: docs/save-parity.md).
+  if (targetKey === "companyValue" && Number.isFinite(absoluteValue)) {
+    profile[targetKey] = String(absoluteValue);
     return;
   }
 
