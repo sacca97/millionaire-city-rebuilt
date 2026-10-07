@@ -79,3 +79,6 @@ archive-recovery-2026-10-06/
 archive-analysis-2026-10-06/
 tools/missions/out/
 apps/client/public-bak/
+
+# machine-specific evidence (absolute /tmp paths and hashes); regenerate with tools/missions/verify.py
+tools/missions/evidence/

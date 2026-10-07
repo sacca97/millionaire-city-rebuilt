@@ -150,3 +150,22 @@ D. Shipping (not started)
 - Bug fixed: the client crashed at boot (`Economy.nodeOf`) when a save held an item whose definition is not served (e.g. expired limited-edition `houses_015_001_bavarian`). `Game.boot` now keeps such items in the save untouched but does not simulate them (`console.warn`). Covered by tsc/vitest only; not driven at runtime with such a save. TODO: add a regression test with a save containing an unknown sku.
 - Open question: in the stress city a click on a decoration selected nothing (before and after the perf changes). Check against the original (`ItemObject`/`Tool` select rules for decorations) and the oracle whether decorations are selectable; may be correct.
 - Not done: 5-minute memory soak (a ~20 s run showed flat heap), per-sku split of index.json, ground tiling, gui preview pruning (~15 MB), full place-and-collect run on the optimised build.
+
+## Round 7 update (Lead pass on mission parity, class based; see docs/missions-efficient-plan.md)
+
+Result (docs/missions-status.md, generated): 10 oracle-EQUAL runs (C31 nameCity, C08 build sku, C10 build subgroup, C16/C15 collect, C23/C24 earn incl. alt mission 98, C30 moveHouse, C12 buyExpansion) = 104 missions MATCH (10 oracle + 94 by class), 4 STATIC (alt checkInfluence missions without `amount`), 90 DEFERRED, 120 TODO.
+
+Fixed in the client (all verified against the preserved original runs):
+- Security baseline order: `security.init()` now runs AFTER the boot-time company value recompute, as the original does (DollarsGame.as:815 recompute, :1582 securityInit): first snapshot compValueGain 0 (was +152,000).
+- Decorations placed or moved onto owned terrain destroy that terrain with refund + `update_map del Terrain` (Map.placeItem :1514-1527, destroyTile/destroyTileApplyEconomy); order new_item, del Terrain, poll (move: del Terrain before the move cost and command); `dec` = 1 for decorations on move/destroy (getFormatId).
+- `update_next_rent`: Profile.nextRentUpdate dedupe rule ported (same item running down to 0 sends nothing).
+- Earn thresholds checked against the SAVED coins/cash/company value at load are local counts (nothing sent before RUN_WORLD; Profile.eventsBuild), the recomputed company value is checked afterwards and sends.
+- Plot purchase: company value recomputed after the `update_plots` command (Map.buyPlot), mission event registered after it.
+- Construction end: the building value is added after the `new_state` command is created (the next snapshot carries it); `smLastCompValueGain` starts NaN (serialises as null) like the original.
+- checkInfluence missions (39) were never fed (nothing listened to `commerce-population`).
+
+Accepted differences (tools/missions/accepted.json, with reasons): seed timestamps (`dailyRewardsLastGivenDate`), flow-timing countdowns, and in C15 the `update_next_rent` 180 caused by our page-unload flush of queued commands (the original loses commands still queued when the page reloads).
+
+OPEN, high priority gameplay difference found (not implemented): CONSTRUCTION END NEEDS A CLICK in the original. When construction time reaches 0 (also right after an instant build) the house shows `NotificationConstructionEnd` (`Event_Contract_anim`, StateOnConstructionOwner.as:268-278); clicking it calls `company.initItemAfterConstruction` (NotificationConstructionEnd.as:onAccept), which sends `new_state` RENT and adds the building value. Ours completes automatically. Effect: C26 (instant build) stays DIFFERENT (original keeps `Item id0 mode 4 time <remaining>` in the save until the click; ours writes `id1 mode1` at once) and the timing of company value/new_state differs in every build flow. Needs: construction-end state in `game/simulation.ts` and `game.ts` (no auto transition), click handling in `activateTile`, the bubble in `ui/extras/bubbles.ts`, load behaviour for items whose time ran out, tutorial instant-build step, and test updates.
+
+Other open: C24-308 (alt) needs `altMissions:1` in its seed; classes C06, C07, C09, C11, C17-C20, C25, C29 still blocked on flow authoring (placement coordinates), influence/bonus classes C13, C14, C03-C05 not attempted. Harness fixes: `tools/oracle/run.mjs` now writes `out/flow-<FLOW>`; `tools/missions/rerun_ours.sh` reruns our side against a preserved original run.

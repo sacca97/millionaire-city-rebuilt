@@ -317,6 +317,9 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     this.pushSuspension(true);
     // DollarsGame.as:815 (world attached, owner): Profile.calculateCompanyValue() recomputes the company value from the items.
     this.companyValue = this.companyValueBreakdown().total;
+    // UserDataFacade.securityInit runs later, at STATE_RUN_WORLD (DollarsGame.as:1582), i.e. AFTER the recompute above: the baseline is the
+    // recomputed value, so the first security snapshot carries compValueGain 0 (oracle runs C31/C26/C12: ORIG 0 vs ours +152,000 before this).
+    this.commands.security.init();
     this.checkFourMillions();
     this.refreshNextRent();
   }
@@ -564,23 +567,37 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
   }
 
   private lastNextRent: number | undefined;
+  /** Profile.mNextRentCurrentValue / mNextRentCurrentItemSid (Profile.as:945-975): what the profile last reported (even when nothing was sent). */
+  private profileNextRent = { value: 0, sid: null as string | null };
   /**
-   * Company.nextRentCalculate -> Profile.nextRentUpdate (Profile.as:945-975): after item changes the owner reports the soonest rent to the server
-   * (update_next_rent, seconds; 0 = a rent is ready, -1 = none) whenever the value differs. The tutorial controller sends its own.
+   * Company.nextRentCalculate -> Profile.nextRentUpdate (Profile.as:945-975): the owner reports the soonest rent to the server
+   * (update_next_rent, seconds; 0 = a rent is ready, -1 = none). Company level: only when the value changed. Profile level: while the
+   * previously reported value is > 0 it only sends when a DIFFERENT item became the next one (so the same item running down to 0 sends
+   * nothing); otherwise it sends when the value differs. The tutorial controller sends its own.
    */
   private refreshNextRent(): void {
     if (this.tutorial) return;
     let ready = false;
     let min = Number.POSITIVE_INFINITY;
+    let minSid: string | null = null;
     for (const it of this.itemMap.values()) {
       if (it.stateId !== STATE_ID.RENT) continue;
       if (it.mode === RENT_MODE.GET_RENT) ready = true;
-      else if (it.mode === RENT_MODE.RENTING && it.time < min) min = it.time;
+      else if (it.mode === RENT_MODE.RENTING && it.time < min) {
+        min = it.time;
+        minSid = it.sid;
+      }
     }
     const value = ready ? 0 : Number.isFinite(min) ? Math.max(1, min) : -1;
     if (value === this.lastNextRent) return;
     this.lastNextRent = value;
-    this.send(this.commands.nextRent(value > 0 ? Math.trunc(value / 1000) : value));
+    const pf = this.profileNextRent;
+    // A ready rent (value 0) keeps the same "current item" (Company.nextRentCalculate only sets the value to 0); no rent at all clears it.
+    const sid = ready ? pf.sid : value > 0 ? minSid : null;
+    const changed = pf.value > 0 ? pf.sid === null || sid === null || sid !== pf.sid : pf.value !== value;
+    pf.value = value;
+    pf.sid = sid;
+    if (changed) this.send(this.commands.nextRent(value > 0 ? Math.trunc(value / 1000) : value));
   }
 
   private send(cmd: PacketCommand | null): void {
@@ -677,22 +694,28 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     }
   }
 
+  private addConstructionValue(item: GameItem | undefined): void {
+    if (!item) return;
+    this.companyValue += item.def.rules.companyValue; // CompanyMine.initItemAfterBuying (CompanyMine.as:31-44)
+    this.emitProfile();
+  }
+
   /** Sends the server notifications the original sends for each timer transition. */
   private handleTransitions(transitions: Transition[]): void {
     for (const { type, rt } of transitions) {
       const item = this.itemMap.get(rt.sid);
       switch (type) {
         case "constructionDone":
-          if (item) {
-            this.companyValue += item.def.rules.companyValue; // CompanyMine.initItemAfterBuying (CompanyMine.as:31-44)
-            this.emitProfile();
-          }
+          // ItemObject.changeState sends `new_state` (with securityUpdate()) BEFORE the new state's enter() runs initItemAfterBuying
+          // (CompanyMine.as:31-44) which adds the building value: the value shows up in the NEXT snapshot (oracle C15: new_state cvGain 0, cvNow 842,000).
           if (rt.isWonder) {
             // CompanyMine.initItemAfterBuying (:37): wonders enter StateOnBuilt (id 5); the effects start (StateOnBuilt.enter :80-90).
             this.send(this.commands.newState(rt.sid, rt.sku, { state: STATE_ID.BUILT, mode: 0, time: 0 }));
+            this.addConstructionValue(item);
             this.economy.invalidateWonders();
           } else {
             this.send(this.commands.finishConstruction(rt.sid, rt.sku));
+            this.addConstructionValue(item);
             // StateOnRent.doEnter (:260-270): commerces start renting at once and report mode 4 with the income time.
             if (rt.isCommerce) this.send(this.commands.rentMode(rt.sid, rt.sku, { mode: RENT_MODE.RENTING, time: Math.round(rt.time) }, NO_GAIN));
           }
@@ -862,6 +885,7 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
         ...(fromStorage ? { extra: { key: "storage", value: "true" } } : gift?.extra ? { extra: gift.extra } : {})
       })
     );
+    if (built) this.destroyTerrainUnder(r, tx, ty); // Map.placeItem: decorations on owned terrain remove it (after new_item, before the poll)
     if (!built) {
       this.addExp(r.exp);
       this.syncBaseline();
@@ -1050,6 +1074,25 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     if (item) this.send(this.commands.setSuspended(item.sid, item.sku, false, Math.round(item.time)));
   }
 
+  /** ItemDefinition.getFormatId: decorations use the short format (1) with Config.OPT_USE_SHORT_FORMAT (oracle: dec 1 on new_item/move). */
+  private formatIdOf(sku: string): number {
+    return this.defs.get(sku)?.rules.kind === "decoration" ? 1 : 0;
+  }
+
+  /**
+   * Map.placeItem (Map.as:1514-1527): tiles of the footprint that are owned terrain are destroyed when the item does not require
+   * owned terrain (decorations): destroyTile -> destroyTileApplyEconomy (company value -= terrain price, coins += destroy profit) and
+   * `update_map del Terrain` per tile. Oracle order: new_item, del Terrain x N, pollmanager build (move: del Terrain before `move`).
+   */
+  private destroyTerrainUnder(def: ItemDefinition, tx: number, ty: number): void {
+    if (requiresTerrainMine(def)) return;
+    for (let dx = 0; dx < def.baseCols; dx += 1) {
+      for (let dy = 0; dy < def.baseRows; dy += 1) {
+        if (this.world.tile(tx + dx, ty + dy)?.terrain) this.removeTerrain(tx + dx, ty + dy);
+      }
+    }
+  }
+
   moveItem(sid: string, tx: number, ty: number, confirmed = false): boolean {
     const c = this.checkMove(sid, tx, ty);
     const item = this.itemMap.get(sid);
@@ -1061,6 +1104,9 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
       this.hooks.confirmMove(sid, tx, ty);
       return true;
     }
+    // Map.placeItem destroys owned terrain under a non-terrain item (decorations) BEFORE the move cost is paid and sent
+    // (oracle C30: update_map del Terrain +1000, then update_item move -400; doing it after consumed the -400 into the baseline).
+    this.destroyTerrainUnder(item.def.rules, tx, ty);
     const cost = this.moveRented ? 0 : this.movePrice(item);
     this.addCoins(-cost);
     this.world.removeItem(sid); // footprint is derived from the (still old) placed.x/y
@@ -1071,7 +1117,7 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     this.syncPlaced(item);
     this.world.addItem(item.placed);
     this.resumeMoving(); // ItemObject.move -> endMoving() -> resume() precedes the move call (oracle: upd_suspended 0 then move)
-    this.send(this.commands.move(sid, item.x, item.y, 0));
+    this.send(this.commands.move(sid, item.x, item.y, this.formatIdOf(item.sku)));
     this.emit("item-changed", item);
     this.emit("sound", { event: "item_moved" });
     this.poll("moveHouse", item.sku); // ToolMove.as:263
@@ -1104,7 +1150,7 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     this.world.removeItem(sid);
     this.itemMap.delete(sid);
     if (this.selected?.sid === sid) this.select(null);
-    this.send(this.commands.destroy(sid, 0));
+    this.send(this.commands.destroy(sid, this.formatIdOf(item.sku)));
     this.emit("item-removed", { sid, sku: item.sku });
     this.refreshNextRent();
     this.emit("sound", { event: "item_demolished", isDecoration: item.def.rules.kind === "decoration" });
@@ -1691,7 +1737,12 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
         if (d.unlockedOrder === order + 1 && ex.states[i] === 0) ex.states[i] = 1;
       });
     }
+    // Map.buyPlot (Map.as:1346-1393): updatePlots is sent with the snapshot of the spent coins, and only then Profile.calculateCompanyValue()
+    // recomputes the value (adding the plot's expansion value, e.g. +1,740,000 in oracle C12), which the NEXT command's snapshot reports as
+    // compValueGain. The mission commands triggered by the buyExpansion event come after (the original updates missions on a later frame), so the
+    // event is registered after the plots command: registering it first lets update_missions consume the coin gain (server then misses the -4,000,000).
     this.send(this.commands.buyPlot(plot));
+    this.companyValue = this.companyValueBreakdown().total;
     this.poll("buyExpansion"); // Map.as:1760
     this.emit("map", { kind: "terrain" });
     this.emitProfile();

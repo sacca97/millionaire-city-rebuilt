@@ -60,6 +60,8 @@ export class MissionSystem {
   private updating = false;
   private updatePending = false;
   private lastAlert: MissionAlert = "none";
+  /** UserDataFacadeOnline.updatePollManager only sends in STATE_RUN_WORLD (UDFO.as:1712-1720): the load-time checks are local counts. */
+  private muteSends = false;
   private timer: ReturnType<typeof setInterval> | undefined;
   private readonly tableDefs: DefinitionTable;
 
@@ -78,6 +80,7 @@ export class MissionSystem {
         game.sendCommand(game.commands.mission(sku, claim));
       },
       poll: (action, type, parameter, value) => {
+        if (this.muteSends) return;
         game.sendCommand(action === "add" ? game.commands.poll("add", type, parameter) : game.commands.poll("update", type, parameter, value ?? "0"));
       },
       pay: (g: RewardGain) => void game.applyGain({ coins: g.coins, exp: g.exp, cash: g.cash }),
@@ -88,6 +91,16 @@ export class MissionSystem {
     const save = game.state.profile;
     this.manager.build({ ...save.missions, pollCounts: save.pollCounts });
     this.wire();
+    // Profile.build -> eventsBuild (Profile.as:578, 1074-1083; ATTRIBUTES_KEYS = companyValue, DCCoins, DCCash): the SAVED values are checked
+    // against the earn/beat thresholds before the world runs, where nothing is sent (oracle C24: the original never sends `earn DCCoins`
+    // when the save already holds the coins). The recomputed company value is checked afterwards, in RUN_WORLD, and does send.
+    this.muteSends = true;
+    try {
+      const n = (v: string | undefined): number => Number(v ?? 0) || 0;
+      checkProfileMissionEvents(this.manager, { coins: n(raw.DCCoins), cash: n(raw.DCCash), companyValue: n(raw.companyValue) });
+    } finally {
+      this.muteSends = false;
+    }
     checkProfileMissionEvents(this.manager, game.profile);
     this.update();
     this.timer = setInterval(() => this.update(), 1000);

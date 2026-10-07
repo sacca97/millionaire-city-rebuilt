@@ -146,3 +146,69 @@ YOU MAY EDIT ONLY: new files tools/oracle/flows/mission-<class>-*.mjs, tools/mis
 ### Afterwards (the Lead's job, or a strong model later)
 
 Read `tools/missions/worker-notes/OPEN-QUESTIONS.md`; for each item follow the Lead prompt (section 2, task C): fix product code, or add an accepted difference with a reason to `tools/missions/accepted.json`, or tell the model how to fix the flow; rerun `verify.py` for that class; rerun `mark.py`. A cheap model is good at the repetitive flow work and weak at deciding what a difference means, so that decision is deliberately left out of its prompt.
+
+## 7. Current state (read before choosing classes; supersedes the class lists above where they differ)
+
+Evidence-backed EQUAL (original vs ours, commands + saved documents + reload): C31 nameCity (1), C08 build sku n=1 (6), C10 build subgroup n>1 (10), C12 buyExpansion (4), C15 collect nameType (35), C16 collect nameType/unlock sku (36), C23 earn (43, alt 98), C24 earn/unlock sku (45), C30 moveHouse subgroup (87). `docs/missions-status.md` is the authoritative table (regenerate with `python3 tools/missions/mark.py`).
+
+Tooling added since sections 1-6:
+- `tools/oracle/run.mjs` now writes the original's output to `tools/oracle/out/flow-<FLOW>/` (section 1 paths are correct).
+- `tools/missions/rerun_ours.sh C16:36 ...` reruns OUR client only against a preserved original run in `/tmp/solo-<CLASS>-evidence/orig*` (the original runs of C06..C31 from the first worker pass are still there) and verifies; use it after a product change instead of rerunning the original.
+- `tools/missions/accepted.json` is maintained by the Lead only (current entries: volatile timestamps, daily-reward roll and earnDCCoins, seed timestamp `dailyRewardsLastGivenDate`, and a few flow-specific timing countdowns). A new difference is NEVER added by a worker.
+- `docs/missions-flow-recipes.md` now has the VERIFIED map geometry (top-down, 32 px tiles), terrain seeding, reload timing, contract 154 for `Houses%2`, and the correct alt flag `altMissions:1`.
+
+What is still missing (class: mission rep: exact blocker and hint):
+
+| Class | Rep | Status | Blocker / hint |
+|---|---|---|---|
+| C24 | 308 (alt) | flow fixed (seed now sets `altMissions:1`), not rerun yet | rerun original + ours; mission 308 needs mission 98 given first (`unlockSku`): seed `Given` with 98 if it stays `up` |
+| C07 | 148 (alt) | flow only boots | write the real build (build mission with no parameter, amount>1; read the definition) and add the alt flag |
+| C09 | 11, rep2 92 (alt) | BLOCKED (shop paging) | the shop REMEMBERS its last page/tab: after the first buy the next shop open already shows the same page; never navigate blindly, take a screenshot first. Fountain (`decorations_font_02`, level 12, 2x2, 80,000) is on Decorations page 5, price button (641,358). Seed exp=12000 |
+| C06 | 9 | BLOCKED (placement) | 5 Pizzerias (3x3, 60,000 each): seed owned terrain blocks (recipes), not terrain clicks; the map is top-down |
+| C11 | 2 (buy commerce_pizza) | not attempted | needs one placed Pizzeria with the `buy` event; use the seeded 3x3 terrain block |
+| C17 | 31 | BLOCKED (placement) | one Pizzeria placed and collected; seeded terrain block; mission 31 needs mission 18 given (set `Given: "18"`) |
+| C19 | 32, rep2 255 (alt) | not attempted | 5 Pizzeria collects |
+| C18 | 95 (alt) | not attempted | alt flag + commerce collect |
+| C20 | 55, rep2 139 (alt) | BLOCKED | `Houses%2`: contract 154 (see recipes), poll chunk `collectHouses%2/199` |
+| C25 | 64, rep2 94 (alt) | BLOCKED (trigger unknown) | the email popup trigger; Lead investigates (`PopupEmail`) |
+| C29 | 110 (alt) | not attempted | alt flag + move of an item with the rep's sku (read the definition) |
+| C26 | 5, rep2 91 | DIFFERENT, product gap | the original needs a CLICK on the construction-end notification (see `docs/parity-plan.md` Round 7); Lead implements first, then rerun with `rerun_ours.sh C26:5` |
+| C13, C14, C03, C04, C05 | 23/93, 18/266, 25, 29/99, 27 | not attempted | influence/bonus: commerce next to houses; Lead |
+
+### Prompt for the next testing agent (single sequential agent, any model)
+
+```text
+You are the sole agent on the remaining mission-parity classes of /home/sacca/Projects/millionaire-city-rebuilt. You work alone, one class at a time, and you can lose context between steps, so your memory is tools/missions/worker-notes/PROGRESS.md (read it FIRST in every session, update it after EVERY class).
+
+STEP 0, once per session, read in this order and nothing else unless a step says so:
+  1. docs/missions-agent-instructions.md sections 0, 1, 6 and 7
+  2. docs/missions-flow-recipes.md (all of it: it contains the verified map geometry, terrain seeding, reload wait, contract 154, alt flag)
+  3. tools/oracle/README.md
+  4. tools/missions/worker-notes/PROGRESS.md and the class note tools/missions/worker-notes/<Cxx>.md of the class you work on
+Do not read decompiled sources, archive-recovery, or product code.
+
+SETTINGS: oracle ports MCITY_ORACLE_PORT_BASE=31853, our PORT=31863, scratch name solo. Build our test client once per session (and again only if the lead tells you apps/client changed):
+  cd /home/sacca/Projects/millionaire-city-rebuilt/apps/client && npx vite build --outDir /tmp/mc-solo
+Confirm /tmp/mc-solo/index.html exists.
+
+CLASS ORDER (skip classes already EQUAL in docs/missions-status.md, skip C26 until the lead says the construction-end notification is implemented, never attempt C13 C14 C03 C04 C05 C25): 
+  C24-308 (alt), C20 (55), C09 (11), C06 (9), C11 (2), C17 (31), C19 (32), C07 (148 alt), C18 (95 alt), C29 (110 alt).
+Section 7 of the instructions has the exact blocker and hint for each. 
+
+LOOP for each class:
+  a. Follow section 1 steps 1-6 EXACTLY (copy the closest existing flow; a new flow file tools/oracle/flows/mission-<class>-<rep>.mjs; if a flow already exists for that rep, edit that file).
+  b. Completion check WITHOUT images, for the ORIGINAL and for ours:
+       python3 tools/missions/check_completed.py <completed.saves.json> <rep>   (both must print "<rep>: given")
+     The original's output is in tools/oracle/out/flow-mission-<class>-<rep>/, ours in /tmp/ours-solo-<class>/. If the ORIGINAL does not complete the mission, fix the CLICKS/seed in your flow (never the product), max 3 attempts per class.
+  c. verify.py (section 1 step 6; always pass --reload and --reward-group 0). One row in PROGRESS.md per attempt outcome.
+  d. EQUAL: next class. DIFFERENT/INVALID/BLOCKED: copy the verbatim verify output (max 25 lines) and the file paths into tools/missions/worker-notes/<Cxx>.md AND append an entry to tools/missions/worker-notes/OPEN-QUESTIONS.md; do NOT explain away, accept, or retry a difference.
+  e. Delete /tmp/ours-solo-<class> after each class (keep /tmp/mc-solo).
+
+HARD RULES FOR FLOWS: put `await sleep(8000)` before every `reload()`; seed owned terrain for 3x3 commerces instead of clicking nine tiles; keep DCCoins around 500000 unless the flow is an earn mission; map tile (tx,ty) is at stage x=556+(tx-6)*32, y=225+(ty+2)*32 (top-down, NOT isometric); take a screenshot and read the dump (check_completed.py, stat() output) before assuming a click worked.
+
+LIMITS: 3 attempts per flow, about 30 minutes per class, then mark BLOCKED and move on. Never paste whole dumps or logs; use check_completed.py and the first 25 lines of verify output.
+
+AT THE END: python3 tools/missions/mark.py ; delete /tmp/mc-solo and /tmp/ours-solo-* ; confirm with `ss -ltnp | grep -E '3185|3186'` that nothing of yours listens; output the final report: the PROGRESS.md rows you added, the OPEN-QUESTIONS.md entries you added, and the "Counts:" line from mark.py.
+
+YOU MAY EDIT ONLY: new or existing tools/oracle/flows/mission-<class>-*.mjs for your classes, tools/missions/worker-notes/*. YOU MUST NOT: edit apps/, packages/, docs/, tools/missions/*.py|json|sh, tools/oracle/* (except those flow files), run git commit/add/stash/checkout/reset, use pkill or killall, touch ports other than 31853-31856 and 31863-31865, touch the dev server on 31803/31804/5173, run tools/apply_optimised_assets.py, modify apps/client/public. If a step needs any of that, stop and write it in OPEN-QUESTIONS.md.
+```

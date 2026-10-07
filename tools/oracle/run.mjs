@@ -12,7 +12,9 @@ if (!name || !fs.existsSync(path.join(dir, name + ".mjs"))) {
   process.exit(2);
 }
 const sc = (await import(path.join(dir, name + ".mjs"))).default;
-const o = await createOracle(name, { seed: sc.seed, width: sc.width, height: sc.height });
+// shared flows write to out/flow-<FLOW> (not out/flow) so consecutive flow runs keep their own output
+const outName = name === "flow" && process.env.FLOW ? `flow-${process.env.FLOW}` : name;
+const o = await createOracle(outName, { seed: sc.seed, width: sc.width, height: sc.height });
 let code = 0;
 const onSig = () => o.stop().finally(() => process.exit(130));
 process.on("SIGINT", onSig); process.on("SIGTERM", onSig);

@@ -59,7 +59,8 @@ export class SecurityTracker {
   private coins = 0;
   private cash = 0;
   private compValue = 0;
-  private lastCompValueGain = 0;
+  /** UserDataFacade.smLastCompValueGain is an uninitialised static Number (NaN) until the first securityUpdate(): it serialises as null (oracle C15 `new_mode 5`). */
+  private lastCompValueGain = Number.NaN;
 
   constructor(private readonly profile: () => ProfileSnapshot) {}
 

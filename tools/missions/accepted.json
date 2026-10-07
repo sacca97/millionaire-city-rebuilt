@@ -1,5 +1,42 @@
 [
-  {"pattern": "savedAt|updated_at|lastLogin|timestamp", "reason": "volatile timestamps (also ignored by save-diff.py)"},
-  {"pattern": "dailyRewardsNextRewardId", "reason": "random roll, differs by design (docs/save-parity.md)"},
-  {"pattern": "earnDCCoins", "reason": "accepted difference, no gameplay effect (docs/save-parity.md Round 5)"}
+  {
+    "pattern": "savedAt|updated_at|lastLogin|timestamp",
+    "reason": "volatile timestamps (also ignored by save-diff.py)"
+  },
+  {
+    "pattern": "dailyRewardsNextRewardId",
+    "reason": "random roll, differs by design (docs/save-parity.md)"
+  },
+  {
+    "pattern": "earnDCCoins",
+    "reason": "accepted difference, no gameplay effect (docs/save-parity.md Round 5)"
+  },
+  {
+    "pattern": "dailyRewardsLastGivenDate",
+    "reason": "flow seed (tools/oracle/flowlib.mjs seedFlow) writes Date.now() into the daily bonus doc per client run; differs by construction"
+  },
+  {
+    "pattern": "final\\.saves\\.json: .*houses_001_002@6,-2\\]/Item\\[id0\\]/time",
+    "reason": "mission-C08-6 only: remaining construction countdown dumped after the reload depends on the wall-clock time at which each client's flow reloads (31 s apart); not a logic difference"
+  },
+  {
+    "pattern": "cmds:\\s+#0 /_dat/time: ORIG=3590950 OURS=",
+    "reason": "mission-C15-35 only: remaining rent time reported on collect depends on the wall-clock time between the flow's contract and collect clicks (~1.5 s apart); not a logic difference"
+  },
+  {
+    "pattern": "== \\('update_next_rent', 'update_next_rent', None, None\\) orig x5 ours x6",
+    "reason": "mission-C15-35 only: our client flushes queued commands on page unload (keepalive), the original loses commands still queued when the flow reloads the page, so ours sends the contract-time next_rent 180 (and one extra -1) that the original never delivered"
+  },
+  {
+    "pattern": "/_dat/next_rent: ORIG=2 OURS=180",
+    "reason": "same cause as the update_next_rent count line (pagehide flush); positional shift"
+  },
+  {
+    "pattern": "/_dat/next_rent: ORIG=-1 OURS=2",
+    "reason": "same cause as the update_next_rent count line (pagehide flush); positional shift"
+  },
+  {
+    "pattern": "only in OURS .*update_next_rent.*next_rent\": -1",
+    "reason": "same cause as the update_next_rent count line (pagehide flush)"
+  }
 ]

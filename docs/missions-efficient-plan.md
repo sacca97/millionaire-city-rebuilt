@@ -1,5 +1,7 @@
 # Efficient mission parity: class-based plan
 
+STATUS (latest): 9 mechanism classes are EQUAL against the original (C08, C10, C12, C15, C16, C23, C24, C30, C31 = 104 missions MATCH, see `docs/missions-status.md`); the remaining work, blockers and the next agent prompt are in `docs/missions-agent-instructions.md` section 7. Class ids are those of the CURRENT `docs/missions-classes.md` (they changed once when parameter resolution was fixed).
+
 Replaces the "test all 318 missions one by one on the oracle" approach of `docs/missions-parity-plan.md` / `docs/missions-complete-checklist.md` (keep those as history; do not extend the checklist by hand). The agent instructions to paste into models are in `docs/missions-agent-instructions.md`.
 
 ## 1. Idea
