@@ -26,6 +26,14 @@ export function setLocale(lines: string[] | string, language = 'EN'): void {
   lang = language;
 }
 
+/** Replace individual texts after the locale was loaded (client-side wording changes, e.g. the give-back mission). */
+export function overrideTexts(map: Record<string, string>): void {
+  for (const [tid, value] of Object.entries(map)) {
+    const i = tidIndex(tid);
+    if (i >= 0) texts[i] = value;
+  }
+}
+
 export function currentLang(): string {
   return lang;
 }

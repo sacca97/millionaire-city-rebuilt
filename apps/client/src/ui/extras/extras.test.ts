@@ -3,7 +3,8 @@ import { RENT_MODE, STATE_ID } from '../../net/commands';
 import { bubbleTransition, isAbandoned, type Snap } from './bubbles';
 import { clipFrameAt } from './clip';
 import { DEFAULT_TID, parseCrossPromos } from './crosspromo';
-import { emailError, isMail } from './email';
+import { GIVE_BACK_TEXTS, GIVE_BACK_UNLOCK_COMPANY_VALUE } from './charity.config';
+import { getText, overrideTexts, setLocale, tidIndex } from '../../gui/i18n';
 import { coverTimeline } from './journal';
 import { newsFeedDescTid, newsFeedReward, parseNewsFeeds, parseRewardClickSounds, presentable } from './newsfeed';
 import { isAnimatedPlane, parsePlaneRewards, planeGone, planeX, plainClassFor } from './plane';
@@ -102,19 +103,15 @@ describe('welcome chain', () => {
   });
 });
 
-describe('email popup', () => {
-  it('TextManager.isMail', () => {
-    expect(isMail('bob@mail.com')).toBe(true);
-    expect(isMail('bob@mail')).toBe(false);
-    expect(isMail('a@@b.com')).toBe(false);
-    expect(isMail('@b.com')).toBe(false);
-    expect(isMail('bob@m.c')).toBe(false);
-    expect(isMail('bob@x.abcde')).toBe(false);
-  });
-  it('error texts', () => {
-    expect(emailError('bob', 'mail.com')).toBeNull();
-    expect(emailError('bob', 'x')).toBe('TID_MISSION64_SINTAX_ERROR');
-    expect(emailError('bob', 'domain.com')).toBe('TID_MESSION64_POPUPERROR3');
+describe('give-back mission texts', () => {
+  it('overrides exist as TIDs and replace the email wording', () => {
+    for (const tid of Object.keys(GIVE_BACK_TEXTS)) expect(tidIndex(tid)).toBeGreaterThanOrEqual(0);
+    setLocale(Array.from({ length: 2000 }, () => 'orig'));
+    overrideTexts(GIVE_BACK_TEXTS);
+    expect(getText('TID_MISSION_064_TITLE')).toBe('Give Back');
+    expect(getText('TID_MISSION_006A_TITLE')).toBe('Give back');
+    expect(getText('TID_MISSION_064_DESC')).not.toMatch(/mail/i);
+    expect(GIVE_BACK_UNLOCK_COMPANY_VALUE).toBe(1_000_000);
   });
 });
 

@@ -281,3 +281,32 @@ describe("MissionManager state machine", () => {
     expect(m.getMissionBySku("56")?.def.eventCondition).toBe(50_000_000);
   });
 });
+
+describe("give-back missions (giveEmail 64 / 94) unlock by company value", () => {
+  const defs = activeDefinitions(ALL, false);
+  const value = { v: 500_000 };
+  const host = (): { host: MissionHost; log: Log } => {
+    const h = makeHost({ v: 1 });
+    h.host.companyValue = () => value.v;
+    return h;
+  };
+  it("a persisted Up mission 64 stays LOCKED below the threshold and unlocks when the value is reached", () => {
+    const { host: h, log } = host();
+    const m = new MissionManager(h, defs);
+    m.build({ ...EMPTY, up: ["64"] });
+    m.update();
+    expect(m.getMissionBySku("64")?.state).toBe(STATE_LOCKED);
+    expect(m.persistence().up).not.toContain("64");
+    value.v = 1_000_000;
+    m.update();
+    expect(m.getMissionBySku("64")?.state).toBe(STATE_UNLOCKED);
+    expect(log.missions.some((x) => x.sku === 64 && x.claim === undefined)).toBe(true);
+  });
+  it("without a companyValue host (original rule) nothing changes", () => {
+    const { host: h } = makeHost({ v: 1 });
+    const m = new MissionManager(h, defs);
+    m.build({ ...EMPTY, up: ["64"] });
+    expect(m.getMissionBySku("64")?.state).toBe(STATE_UNLOCKED);
+  });
+});
+

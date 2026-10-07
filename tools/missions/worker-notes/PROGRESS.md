@@ -32,3 +32,13 @@ Format: one line per class, newest at the bottom. status = EQUAL | DIFFERENT | I
 | C03 | 25 | - | n | - | - | SKIPPED(needs lead) | tools/missions/worker-notes/C03.md (needs commerce+population) |
 | C04 | 29 | - | n | - | - | SKIPPED(needs lead) | tools/missions/worker-notes/C04.md (needs commerce+population) |
 | C05 | 27 | - | n | - | - | SKIPPED(needs lead) | tools/missions/worker-notes/C05.md (needs commerce+population) |
+| C24 | 308 | mission-C24-308.mjs | y | y | 0 | EQUAL | tools/missions/evidence/mission-C24-308.json (seed Given:"98" for unlockSku; altMissions:1) |
+| C20 | 55 | mission-C20-55.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C20.md (55 given on both; update_next_rent/`_dat/time` command metadata, same class as C15-35) |
+| C09 | 11 | mission-C09-11.mjs | y | y | 0 | EQUAL | tools/missions/evidence/mission-C09-11.json (3 free 2x2 grass spots (6,-2)(3,-2)(-4,-2); navigate to shop page 5 every pass) |
+| C06 | 9 | mission-C06-9.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C06.md (9 given both; ours emits update_item/new_mode x5 + upd_suspended + 200 exp/build, original keeps mode=1; same construction-end gap as C26) |
+| C11 | 2 | mission-C11-2.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C11.md (2 given both; rival-buy payload: orig keeps Item time=180000 & compValue 867200, ours time=0 & 927200) |
+| C07 | 148 | mission-C07-148.mjs | n | - | - | BLOCKED | tools/missions/worker-notes/C07.md (altMissions:1 activates the set; 148 not advanced by 2 Cypress (mission 92 completed) nor 2 Bungalows — no build poll emitted) |
+| C17 | 31 | mission-C17-31.mjs | n | - | - | BLOCKED | tools/missions/worker-notes/C17.md (seeded commerce road-connected but Customers 0 -> Income $0, no collect event; 4 attempts) |
+| C29 | 110 | mission-C29-110.mjs | y | y | 0 | EQUAL | tools/missions/evidence/mission-C29-110.json (altMissions:1; seeded Cypress (7,-3); move tool drops it on a bought 2x2 plot) |
+| C23 | 98 | mission-C23-98.mjs | y | y | 0 | EQUAL | tools/missions/evidence/mission-C23-98.json (H2: altMissions:1; no unlockSku on 98, so no Given seed; first ours run crashed at reload, rerun) |
+| C08 | 96 | mission-C08-96.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C08.md (H2: 2 attempts, same diff; orig re-sends update_missions 97-103 after reload and drops them from Up at completion; ours does not) |

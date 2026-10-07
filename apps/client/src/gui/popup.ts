@@ -180,11 +180,13 @@ export class Popup {
       return;
     }
     const last = frames[frames.length - 1];
+    el.style.willChange = 'transform, opacity';
     this.anim = el.animate(frames, { duration: ms, easing, fill: 'forwards' });
     this.anim.onfinish = () => {
       el.style.transform = String(last.transform);
       el.style.opacity = String(last.opacity);
       this.anim?.cancel();
+      el.style.willChange = '';
       done();
     };
   }

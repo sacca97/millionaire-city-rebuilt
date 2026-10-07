@@ -1,8 +1,8 @@
-// Auto-complete the earn mission 308 (companyValue >= 5,000,000) from a seeded 4.8M-coin save; record state and reload.
+// Auto-complete the earn mission 308 (companyValue >= 5,000,000, unlockSku 98) from a seeded 4.8M-coin save; record state and reload.
 export const seed = (_u, prof) => {
   prof.exp = "6000"; prof.DCCoins = "4800000"; prof.millionNewsFeed = "1"; prof.flags = "altMissions:1";
   const missions = prof.Profile.find((entry) => Array.isArray(entry.Missions));
-  missions.Missions = [{ Up: [], chunk: "308" }, { Reached: [], chunk: "" }, { Given: [], chunk: "" }];
+  missions.Missions = [{ Up: [], chunk: "308" }, { Reached: [], chunk: "" }, { Given: [], chunk: "98" }];
 };
 
 export default async function (o) {

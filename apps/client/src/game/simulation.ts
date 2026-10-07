@@ -42,7 +42,7 @@ export interface Transition {
  */
 export function advanceItem(rt: ItemRuntime, dtMs: number, rules: GameRules, env: AdvanceEnv = {}): Transition[] {
   const out: Transition[] = [];
-  if (rt.suspended) {
+  if (rt.suspended && !(rt.stateId === STATE_ID.CONSTRUCTION && rt.mode === CONSTRUCTION_MODE.INIT)) {
     return out; // ItemObject.suspend(): no logic update while the item is cut off from the HQ
   }
   const commerceLike = rt.isCommerce || rt.isClub === true;

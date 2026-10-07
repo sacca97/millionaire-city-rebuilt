@@ -56,6 +56,7 @@ export class CityView {
     this.overlay.addChild(this.ghostGlow, this.ghostGfx);
     app.ticker.add((t) => {
       this.clock += t.deltaMS;
+      this.stepZoom(t.deltaMS);
       this.tick();
     });
     app.stage.addChild(this.world);
@@ -298,15 +299,30 @@ export class CityView {
       (ev) => {
         ev.preventDefault();
         const factor = ev.deltaY < 0 ? 1.1 : 1 / 1.1;
-        const next = Math.min(3, Math.max(0.3, this.world.scale.x * factor));
-        const k = next / this.world.scale.x;
-        this.world.x = ev.offsetX - (ev.offsetX - this.world.x) * k;
-        this.world.y = ev.offsetY - (ev.offsetY - this.world.y) * k;
-        this.world.scale.set(next);
-        this.clampCamera();
+        this.zoomTarget = Math.min(3, Math.max(0.3, (this.zoomTarget ?? this.world.scale.x) * factor));
+        this.zoomAnchor = { x: ev.offsetX, y: ev.offsetY };
       },
       { passive: false }
     );
+  }
+
+  private zoomTarget: number | null = null;
+  private zoomAnchor = { x: 0, y: 0 };
+
+  /** Eases the wheel zoom towards its target about the pointer (frame-rate independent). */
+  private stepZoom(dtMs: number): void {
+    if (this.zoomTarget === null) return;
+    const cur = this.world.scale.x;
+    let next = cur + (this.zoomTarget - cur) * (1 - Math.exp(-dtMs / 70));
+    if (Math.abs(this.zoomTarget - next) < 0.002) {
+      next = this.zoomTarget;
+      this.zoomTarget = null;
+    }
+    const k = next / cur;
+    this.world.x = this.zoomAnchor.x - (this.zoomAnchor.x - this.world.x) * k;
+    this.world.y = this.zoomAnchor.y - (this.zoomAnchor.y - this.world.y) * k;
+    this.world.scale.set(next);
+    this.clampCamera();
   }
 
   /** Draws the build/move/tile ghost (absolute tiles); null hides it. Items get a translucent sprite plus a green/red footprint. */

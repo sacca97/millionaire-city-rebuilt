@@ -75,6 +75,8 @@ export class MissionSystem {
     const defs = activeDefinitions(rewardVariantDefinitions(opts.defs, flags.missionAltReward ?? 0), flags.altMissions === 1);
     const host: MissionHost = {
       level: () => game.profile.level,
+      // `?nogiveback=1` (oracle parity runs only) disables the give-back unlock threshold so mission lists match the original.
+      companyValue: () => (typeof location !== "undefined" && /[?&]nogiveback=1/.test(location.search) ? Number.MAX_SAFE_INTEGER : game.profile.companyValue),
       sendMission: (sku, claim) => {
         // MissionObjectManager.as:283 builds the claim object from the stale baseline; the facade then advances it (UDFO.as:1232-1237): no pre-sync.
         game.sendCommand(game.commands.mission(sku, claim));

@@ -1,5 +1,4 @@
-// C20 sku 55 ("Rock Star Contract", collect Houses%2 amount 200): sign the Rock Star contract (154, income time 2h) on a Bungalow,
-// pre-seed the collectHouses%2 counter at 199, make rent ready and collect once; record claim and reload.
+// C20 probe: place a Bungalow, finish construction, open the contract dialog and screenshot it (find contract 154 = income time 2h, 4th card).
 export const seed = (_u, prof) => {
   prof.exp = "12000"; prof.DCCoins = "500000";
   const missionEntry = prof.Profile.find((entry) => Array.isArray(entry.Missions));
@@ -22,17 +21,8 @@ export default async function (o) {
     const house = mine.Company.find((item) => item.sku === "houses_001_001" && item.x === "6");
     house.Item[0].time = "4000"; house.Item[0].savedAt = String(Date.now());
   });
-  await sleep(8000); await reload(); await sleep(6000);
-  await m(575, 243); await sleep(1200); await c(575, 243); await sleep(2500);
-  await c(290, 375); await sleep(2500); await shot("01-contract-signed");
-  mutateDoc("universe", (u) => {
-    const mine = u.universe.find((entry) => entry.World).World.find((company) => company.whose === "0");
-    const house = mine.Company.find((item) => item.sku === "houses_001_001" && item.x === "6");
-    house.Item[0].time = "3000"; house.Item[0].savedAt = String(Date.now());
-  });
-  await sleep(8000); await reload(); await sleep(4000); await shot("02-rent-ready");
+  await reload(); await sleep(6000);
   await m(575, 243); await sleep(1200); await c(575, 243); await sleep(3000);
-  await shot("03-collected"); stat("collected"); dump("completed");
-  await c(570, 127); await sleep(1000);
-  await sleep(8000); await reload(); await sleep(4000); await shot("reloaded"); stat("reloaded"); dump("final");
+  await shot("01-contract-dialog"); stat("dialog");
+  await dump("probe");
 }

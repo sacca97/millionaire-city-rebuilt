@@ -1,7 +1,4 @@
-// Complete the collect mission 31 ("Pizzalicious Sale I", 1 x commerce_pizza) with a seeded, road-connected Pizzeria (6,1).
-// The tutorial bungalow 2171 is seeded WITHOUT a contract and signed in-session (lib-commerce.mjs signHouse), so the
-// population (Customers > 0) appears during play, as in the real game; a reload then makes the Pizzeria collectable
-// (Income > 0). Collect it once. Mission 31 needs mission 18 given (unlockSku), so 18 is seeded as Given.
+// H1 probe 2: pizza (6,1) seeded, bungalow 2171 WAITING (no contract) and signed in-session. Mission 31 as C17.
 import { seedCommerce, PIZZA_AT_6_1_WAITING, signHouse } from "./lib-commerce.mjs";
 
 export const seed = (u, prof) => {
@@ -14,7 +11,7 @@ export default async function (o) {
   const { sleep, click: c, mv: m, shot, stat, dump, reload } = o;
   await o.boot(); await sleep(4000); await shot("00-ready");
   await signHouse(o); await shot("01-signed");
-  await sleep(8000); await reload(); await sleep(2000); await shot("02-reloaded-before-collect");
+  await sleep(6000); await shot("02-after-sign"); stat("signed");
   await m(588, 353); await sleep(1200); await c(588, 353); await sleep(3000); await shot("03-collected");
   stat("collected"); dump("completed");
   await sleep(8000); await reload(); await shot("reloaded"); stat("reloaded"); dump("final");

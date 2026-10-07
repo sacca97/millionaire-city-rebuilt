@@ -1,4 +1,5 @@
-import { loadLocale } from "../gui/i18n";
+import { loadLocale, overrideTexts } from "../gui/i18n";
+import { GIVE_BACK_TEXTS } from "./extras/charity.config";
 import { popups } from "../gui/popup";
 import type { UiContext } from "./context";
 import { mount as mountExtras } from "./extras";
@@ -17,6 +18,7 @@ import { mount as mountTutorial } from "./tutorial";
  */
 export async function initUI(ctx: UiContext): Promise<void> {
   await loadLocale("EN");
+  overrideTexts(GIVE_BACK_TEXTS); // the email missions (64 / 94) became the optional give-back mission
   popups.mount(ctx.root);
   // areas: add lines below
   await mountHud(ctx);

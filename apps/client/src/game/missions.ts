@@ -43,6 +43,9 @@ export const MISSION_EVENT = {
 
 export const NO_CONDITION = -1; // MissionDefinition.NO_CONDITION
 
+/** Client-side change: the give-your-email missions (64 / 94) became the optional "give back" mission and appear at this company value. */
+export const GIVE_BACK_UNLOCK_COMPANY_VALUE = 1_000_000;
+
 /** RewardManager.REWARD_*_ID; anything else is an item sku (MissionDefinition.parseRewards default branch). */
 export type MissionReward = { kind: "coins"; amount: number } | { kind: "exp"; amount: number } | { kind: "item"; amount: number; sku: string };
 
@@ -422,6 +425,8 @@ export class MissionObject {
   /** UnlockMissionByLevel / UnlockMissionBySku (unlock/*.as) + the "Friend" exception (:253-261). */
   private checkUnlock(): boolean {
     if (this.def.eventParameter === "Friend") return false;
+    if (this.mgr.isGiveBackLocked(this.def)) return false;
+    if (this.def.eventType === MISSION_EVENT.giveEmail && this.mgr.host.companyValue) return true; // company value reached the threshold
     if (this.def.unlockLevel > -1) return this.mgr.host.level() >= this.def.unlockLevel;
     if (this.def.unlockSku !== "") {
       const dep = this.mgr.getMissionBySku(this.def.unlockSku);
@@ -466,6 +471,8 @@ export interface RewardGain {
 
 export interface MissionHost extends PollSink {
   level(): number;
+  /** Optional: current company value, used only by the give-back (giveEmail) missions' unlock rule. */
+  companyValue?(): number;
   /** UDFO.updateMissions: `claim` = the DELAYED payment values (negative reward) when the new state is GIVEN. */
   sendMission(sku: number, claim?: RewardGain): void;
   /** Delayed payment pay-out: mutate the profile (coins/exp/cash) BEFORE sendMission is built (UDF securityUpdate order). */
@@ -559,7 +566,11 @@ export class MissionManager {
     };
     for (const sku of save.reached) add(sku, LIST_REACHED, STATE_REACHED);
     for (const sku of save.given) add(sku, LIST_GIVEN, STATE_GIVEN);
-    for (const sku of save.up) add(sku, LIST_UP, STATE_UNLOCKED);
+    for (const sku of save.up) {
+      const def = bySku.get(sku);
+      if (def && this.isGiveBackLocked(def)) continue; // not yet at the unlock company value: stays LOCKED (falls into the loop below)
+      add(sku, LIST_UP, STATE_UNLOCKED);
+    }
     for (const def of this.defs) {
       if (done.has(def.sku)) continue;
       const obj = new MissionObject(def, this);
@@ -572,6 +583,12 @@ export class MissionManager {
     this.notifyEnabled = true;
     this.resolveBeatConditions();
     this.poll.build(save.pollCounts);
+  }
+
+  /** The give-back (giveEmail) missions stay locked until the company value reaches GIVE_BACK_UNLOCK_COMPANY_VALUE. */
+  isGiveBackLocked(def: MissionDef): boolean {
+    const value = this.host.companyValue;
+    return def.eventType === MISSION_EVENT.giveEmail && value !== undefined && value.call(this.host) < GIVE_BACK_UNLOCK_COMPANY_VALUE;
   }
 
   /** MissionDefinition.build: `beat` conditions are NPC indexes resolved to their company value. */

@@ -183,3 +183,64 @@ mission-C30-87: DIFFERENT (14 differences, 0 accepted)
 - C13/C14 (checkInfluence) and C03/C04/C05 (bonus) were SKIPPED(needs lead) per section 6: they need a commerce next to houses plus population, and commerce placement is blocked.
 - All notes in `tools/missions/worker-notes/C*.md`.
 
+
+## C20 (collect Houses%2) — sku 55
+
+- Flow `tools/oracle/flows/mission-C20-55.mjs` (+ probe `mission-C20-probe.mjs`). Mission 55 completes, is auto-claimed and persists `55: given` on BOTH clients; coins 500000->557635, poll `collectHouses%2` 199->200 on both.
+- verify.py exit 1. Verbatim (attempt 2, with `sleep(8000)` before reloads):
+```
+mission-C20-55: DIFFERENT (5 differences, 2 accepted)
+   cmds:    #0 /_dat/time: ORIG=7182402 OURS=7180894
+   cmds:    #0 /_dat/security/compValueNow: ORIG=842000 OURS=872000
+   cmds: == ('update_next_rent', 'update_next_rent', None, None) orig x6 ours x5
+   cmds:    #3 /_dat/next_rent: ORIG=0 OURS=-1
+   cmds:    only in ORIG {"_cmd": "update_next_rent", "_dat": {"action": "update_next_rent", "next_rent": -1}}
+```
+- This is the same `update_next_rent` / `/_dat/time` command-metadata mismatch the lead accepted for C15-35; the C15 accepted patterns are value-anchored so they do not match C20. Evidence: `tools/oracle/out/flow-mission-C20-55/`, `/tmp/ours-solo-C20/`; note `tools/missions/worker-notes/C20.md`.
+
+## C06 (build Commerces) — sku 9
+
+- Flow `tools/oracle/flows/mission-C06-9.mjs`. Mission 9 completes, auto-claims and persists `9: given` on BOTH clients (5 Pizzerias, coins 500000->280000, cv=617000).
+- verify.py exit 1, 38 remaining / 2 accepted. First lines:
+```
+mission-C06-9: DIFFERENT (38 differences, 2 accepted)
+   cmds:    #1 /_dat/security/expNow: ORIG=6000 OURS=6200
+   cmds:    #2 /_dat/security/expNow: ORIG=6000 OURS=6400
+   cmds:    #3 /_dat/security/expNow: ORIG=6000 OURS=6600
+   cmds:    #4 /_dat/security/expNow: ORIG=6000 OURS=6800
+   cmds: == ('update_item', 'new_mode', None, 2) orig x1 ours x5
+   cmds: == ('update_item', 'upd_suspended', None, None) orig x0 ours x4
+   cmds:    #17 /_dat/security/expNow: ORIG=6200 OURS=7000
+   completed.saves.json: universe/universe[0]/exp: ORIGINAL='6200' OURS='7000'
+   completed.saves.json: .../Company[commerce_pizza@-10,-5]/Item[id0]/mode: ORIGINAL='1' OURS='2'
+```
+- Ours completes/unsuspends each commerce at build (mode=2, +200 exp each); the original leaves them in construction (mode=1, one 200 exp). Same product gap as C26 (construction-end notification click). Evidence `tools/oracle/out/flow-mission-C06-9/`, `/tmp/ours-solo-C06/`; note `tools/missions/worker-notes/C06.md`.
+
+## C11 (buy) — sku 2
+
+- Flow `tools/oracle/flows/mission-C11-2.mjs` (buys the rival Pizzeria @ -7,-3, click (172,225) + confirm (376,360)). Mission 2 completes and persists `2: given` on BOTH clients (coins 500000->486200).
+- verify.py exit 1. Verbatim:
+```
+mission-C11-2: DIFFERENT (10 differences, 2 accepted)
+   cmds:    #0 /_dat/security/compValueGain: ORIG=9000 OURS=0
+   cmds:    #0 /_dat/security/compValueNow: ORIG=867200 OURS=927200
+   cmds:    #0 /_dat/time: ORIG=180000 OURS=0
+   cmds:    #16 /_dat/security/compValueGain: ORIG=60000 OURS=0
+   cmds:    #17 /_dat/security/compValueGain: ORIG=60000 OURS=0
+   cmds:    #1 /_dat/next_rent: ORIG=-1 OURS=162
+   completed.saves.json: universe/universe[0]/companyValue: ORIGINAL='867200' OURS='927200'
+   completed.saves.json: .../Company[commerce_pizza@-7,-3]/Item[id1]/time: ORIGINAL='180000' OURS='0'
+```
+- Rival-buy handling: original preserves remaining rent time/compValue, ours resets time and differs by 60000. Evidence `tools/oracle/out/flow-mission-C11-2/`, `/tmp/ours-solo-C11/`.
+
+## C07 (alt build none) — sku 148
+
+- Flow `tools/oracle/flows/mission-C07-148.mjs`. `altMissions:1` activates the alt set (Up includes 148 and the other alt missions). But:
+  - 2 Cypress Trees -> poll `builddecorations_tree_01/2`, alt mission 92 completed, `148: up`.
+  - 2 Bungalows (2x2 plots) -> **no pollmanager update at all**, `148: up`.
+- `build|p:none` (148/208/253 "World of Wonder: N More") is not driven by a plain build event. Likely Wonders-specific; cheapest wonder is `wonder_statue_of_money` (Golden Statue, level 1, 10,000 coins, 4x4). Evidence `tools/oracle/out/flow-mission-C07-148/`; note `tools/missions/worker-notes/C07.md`.
+
+## C19 / C18 (collect commerce) — skus 32 / 95
+
+- Both need 5 `commerce_pizza` collections. The single-collect mechanism is BLOCKED in C17 (`tools/missions/worker-notes/C17.md`): a seeded, road-connected Pizzeria reports "Customers: 0 / Income $0", so no collect event. Building our own commerce is blocked by the 20-min construction + construction-end notification-click gap (C06/C26). No flow run for C19/C18.
+- C18 is also an alt mission (`altMissions:1` works, see C07/C29).

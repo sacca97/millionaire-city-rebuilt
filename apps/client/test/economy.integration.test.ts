@@ -148,10 +148,11 @@ describe("economy against the real server", () => {
     await game.flush();
     let w = await dbWorld();
     expect(w.mine!.items.find((i) => i.sid === house.sid)!.suspended).toBe(true);
-    // suspended items do not run: a long elapsed time changes nothing
+    // a never-connected construction site (mode INIT) keeps counting down (StateOnConstruction.as:252-263 ignores isSuspended; oracle mission-C06-9)
     const t0 = house.time;
-    advance(game, 600_000);
-    expect(house.time).toBe(t0);
+    advance(game, 100_000);
+    expect(house.time).toBeLessThan(t0);
+    house.time = t0;
     // a suspended house whose rent is ready does not pay
     house.stateId = STATE_ID.RENT;
     house.mode = RENT_MODE.GET_RENT;
@@ -159,7 +160,7 @@ describe("economy against the real server", () => {
     expect(game.collectRent(house.sid)).toBeNull();
     expect(game.profile.coins).toBe(coins);
     house.stateId = STATE_ID.CONSTRUCTION;
-    house.mode = 2;
+    house.mode = 3; // PAUSED: a running site cut off from the HQ (StateOnConstruction.suspend)
     connect(game, house);
     expect(game.economy.isConnected(house.sid)).toBe(true);
     game.tick(100);

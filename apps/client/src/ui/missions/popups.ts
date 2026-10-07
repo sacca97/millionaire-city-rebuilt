@@ -9,7 +9,7 @@ import { Widget } from "../../gui/widget";
 import { findByName } from "../../gui/layout";
 import type { MissionObject } from "../../game/missions";
 import type { UiContext } from "../context";
-import { openEmailPopup } from "../extras/email";
+import { openCharityPopup } from "../extras/charity";
 import { fillRewardContainer } from "./art";
 import { startNoteRain, stopNoteRain } from "../extras/noterain";
 import { MISSION_IMAGE_SWF, SKU, descriptionKind, imageText, missionDescription, missionTitle } from "./logic";
@@ -51,8 +51,8 @@ export async function openRewardPopup(ctx: UiContext, obj: MissionObject, onClos
 export async function openDescriptionPopup(ctx: UiContext, obj: MissionObject, hooks: { onNamed?: (name: string) => void; onEmail?: (email: string) => void; onClose?: () => void } = {}): Promise<Popup> {
   const def = obj.def;
   const kind = descriptionKind(def);
-  // PopupEmail: offline-safe version in ui/extras/email.ts (no CRM; confirmation is immediate)
-  if (kind === "email") return openEmailPopup(ctx, obj, { onConfirmed: hooks.onEmail, onClose: hooks.onClose });
+  // giveEmail missions (64 / 94): the original PopupEmail registered an address with the CRM; here it is an optional local "give back" message
+  if (kind === "email") return openCharityPopup({ onConfirmed: () => hooks.onEmail?.(""), onClose: hooks.onClose });
   const boss = bossIndex(ctx);
   const base = kind === "name" ? "Name" : kind === "upgrades" ? "upgrades" : "background";
   const withImage = def.imageIsRequired && kind === "plain";

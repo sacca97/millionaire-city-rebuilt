@@ -342,6 +342,25 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
    * ItemObject.suspend/resume (StateOnRent.as:915-990): report the HQ-connection changes to the server (upd_suspended with the
    * remaining time) and mirror them on the item. Skipped during the tutorial (TutorialMachine owns its own gating).
    */
+  /**
+   * StateOnConstruction.suspend/resume (:49-53, 198-212): construction never sends upd_suspended. A never-connected site (mode INIT) is
+   * silent until it connects (build XP + RESUME); a running site that loses the HQ goes PAUSED (new_mode 3) and RESUME again on reconnect.
+   */
+  private constructionConnection(item: GameItem, suspended: boolean, boot: boolean): void {
+    if (item.mode === CONSTRUCTION_MODE.INIT) {
+      if (suspended || boot) return;
+      this.addExp(item.def.rules.exp);
+      this.syncBaseline();
+      item.mode = CONSTRUCTION_MODE.RESUME;
+      this.send(this.commands.constructionMode(item.sid, item.sku, { mode: CONSTRUCTION_MODE.RESUME, time: Math.round(item.time), isSuspended: false }, { exp: item.def.rules.exp, coins: 0, cash: 0 }));
+    } else if (item.mode === CONSTRUCTION_MODE.RESUME || item.mode === CONSTRUCTION_MODE.PAUSED) {
+      const mode = suspended ? CONSTRUCTION_MODE.PAUSED : CONSTRUCTION_MODE.RESUME;
+      if (item.mode === mode || boot) return;
+      item.mode = mode;
+      this.send(this.commands.constructionMode(item.sid, item.sku, { mode, time: Math.round(item.time), isSuspended: suspended }, NO_GAIN));
+    }
+  }
+
   private pushSuspension(boot = false): void {
     if (this.tutorial) return;
     const off = this.economy.disconnectedSids();
@@ -353,7 +372,8 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
         item.placed.suspended = suspended;
         // UserDataFacadeOnline.updateItem only sends in STATE_RUN_WORLD (:128): suspensions found while the world loads are NOT reported
         // (oracle: the NPC house stays isSuspended=0 in the save after the tutorial). Reconnections at load go out (SET_ITEM_CONNECTION).
-        if (!boot || !suspended) this.send(this.commands.setSuspended(item.sid, item.sku, suspended, Math.round(item.time)));
+        if (item.stateId === STATE_ID.CONSTRUCTION) this.constructionConnection(item, suspended, boot);
+        else if (!boot || !suspended) this.send(this.commands.setSuspended(item.sid, item.sku, suspended, Math.round(item.time)));
       }
       this.economy.invalidateWonders();
       this.emit("item-changed", item);
@@ -442,11 +462,14 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     // StateOnIA MODE_BUYING: coins are paid at once (NotificationSellingEnd ctor), the SellBarOnHouse runs SELL_BAR_TIME (3 s), then the
     // building turns into the buyer's (MODE_BOUGHT) and the buy mission event fires (oracle compare4 hb1-hb6).
     const finish = (): void => {
-      this.companyValue += def.rules.companyValue; // value is added when the building changes company (initItemAfterBuying)
-      // Oracle (sell-rival-roads): the footprint becomes the buyer's terrain too (GamePlay.java:2455 mapAdd per tile): a 3x3 townhouse adds 9 x 1,000.
-      this.companyValue += this.terrainPrice * item.cols * item.rows;
       this.send(this.commands.newMode(placed.sid, placed.sku, { mode: 4, time: 0, csid: this.companySid }, NO_GAIN));
-      this.send(this.commands.newState(placed.sid, placed.sku, { state: STATE_ID.RENT, mode: commerce ? RENT_MODE.RENTING : RENT_MODE.WAITING_FOR_CONTRACT, time: 0 }));
+      // Oracle (sell-rival-roads): the footprint becomes the buyer's terrain too (Map.sellTerrain, NotificationSellingEnd.as:83): a 3x3
+      // townhouse adds 9 x 1,000. It comes AFTER the mode-4 packet so the RENT new_state snapshot carries the gain (mission-C11-2: cvGain 9000).
+      this.companyValue += this.terrainPrice * item.cols * item.rows;
+      // Oracle (mission-C11-2): a bought commerce reports its income time (180000) in the RENT new_state, houses 0.
+      this.send(this.commands.newState(placed.sid, placed.sku, { state: STATE_ID.RENT, mode: commerce ? RENT_MODE.RENTING : RENT_MODE.WAITING_FOR_CONTRACT, time: commerce ? item.incomeMs : 0 }));
+      // CompanyMine.initItemAfterBuying (:46) adds the building value AFTER the RENT new_state snapshot (mission-C11-2: new_state cvGain 9000 = terrain only).
+      this.companyValue += def.rules.companyValue;
       this.world.removeItem(rival.sid);
       this.itemMap.set(placed.sid, item);
       this.world.addItem(placed);
@@ -824,8 +847,15 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     );
     if (gift) this.hooks.giftPlaced?.(sku, gift.ref);
     if (fromStorage) this.emit("storage-used", { sku });
-    // ... then StateOnConstruction.resume: exp += def.exp and setMode(RESUME) (StateOnConstruction.as:198-210).
-    if (deferStart) {
+    // ... then StateOnConstruction.resume: exp += def.exp and setMode(RESUME) (StateOnConstruction.as:198-210), but only when the site is
+    // HQ-connected (Map.placeItem -> searchHQConnection -> ItemObject.applyHQConnection :1937); a disconnected site stays INIT and silent
+    // (StateOnConstruction.setMode :162), oracle mission-C06-9.
+    this.economy.invalidate();
+    if (!deferStart && !this.economy.isConnected(sid)) {
+      item.suspended = true;
+      placed.suspended = true;
+      this.syncBaseline();
+    } else if (deferStart) {
       item.suspended = true;
       this.syncBaseline();
     } else {
