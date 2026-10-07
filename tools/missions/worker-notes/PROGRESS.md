@@ -42,3 +42,10 @@ Format: one line per class, newest at the bottom. status = EQUAL | DIFFERENT | I
 | C29 | 110 | mission-C29-110.mjs | y | y | 0 | EQUAL | tools/missions/evidence/mission-C29-110.json (altMissions:1; seeded Cypress (7,-3); move tool drops it on a bought 2x2 plot) |
 | C23 | 98 | mission-C23-98.mjs | y | y | 0 | EQUAL | tools/missions/evidence/mission-C23-98.json (H2: altMissions:1; no unlockSku on 98, so no Given seed; first ours run crashed at reload, rerun) |
 | C08 | 96 | mission-C08-96.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C08.md (H2: 2 attempts, same diff; orig re-sends update_missions 97-103 after reload and drops them from Up at completion; ours does not) |
+| C17 | 31 | mission-C17-31.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C17.md (H1: both complete 31; orig new_mode 6 collect step + one extra update_next_rent; seeded-at-boot checkInfluence gap avoided by in-session signing) |
+| C19 | 32 | mission-C19-32.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C19.md (H1: both give 32 from counter 4 + 1 collect; same collect diff as C17; 5 collects is a counter shortcut) |
+| C13 | 23 | mission-C13-23.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C13.md (H1: both give 23; update_next_rent 3x vs 1x; final companyValue 2424000 vs 2374000) |
+| C14 | 18 | mission-C14-18.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C14.md (H1: both give 18; only update_next_rent 3x vs 1x and house timers) |
+| C03 | 25 | mission-C03-25.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C03.md (H1: both give 25; original sends NO bonus poll update, ours sends bonus houses_001 1 and 2; 61 diffs) |
+| C05 | 27 | mission-C05-27.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C05.md (H1: both give 27; only PollManager chunk: ours persists bonushouses_002_001/1, original sends no bonus update) |
+| C04 | 29 | mission-C04-29.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C04.md (H1: both give 29 (villa 90 pct via 7 fountains); same bonus gap as C05; rep2 99 not run) |

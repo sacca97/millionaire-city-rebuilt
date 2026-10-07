@@ -15,7 +15,7 @@
 // Document layout used: universe[...] World (whose "0") .Company[] items {sid, csid, sku, x, y, isSuspended, Item:[{State:[],id,mode,time,...}]};
 // Map (World) .Map[0] .Terrain (chunk "x:y,x:y,") and .Road (chunk "x:y,...").
 
-const SIZE = { commerce_pizza: [3, 3], houses_001_001: [2, 2], houses_002_001: [3, 3], houses_023_001: [2, 2] };
+const SIZE = { commerce_pizza: [3, 3], houses_001_001: [2, 2], houses_002_001: [3, 3], houses_006_001: [4, 3], houses_023_001: [2, 2] };
 
 export const PIZZA_AT_6_1 = {
   commerce: { sku: "commerce_pizza", sid: "9101", x: 6, y: 1 },
@@ -86,6 +86,17 @@ export const seedCommerce = (u, prof, opts) => {
 export const signHouse = async (o, x = 506, y = 364) => {
   await o.click(x, y); await o.sleep(2500);
   await o.click(290, 215); await o.sleep(4000);
+};
+
+/** Seed houses only (no commerce), waiting for a contract, with their terrain. h: {sid, sku, x, y}. */
+export const seedHouses = (u, houses) => {
+  const mine = mineOf(u);
+  const tiles = [];
+  for (const h of houses) { const [hc, hr] = SIZE[h.sku ?? "houses_001_001"]; tiles.push(...footprint(h.x, h.y, hc, hr)); }
+  addTerrain(u, tiles);
+  for (const h of houses) {
+    mine.Company.push({ Item: [{ State: [], id: "1", mode: "1", time: "0" }], sid: String(h.sid), csid: "1", sku: h.sku ?? "houses_001_001", x: String(h.x), y: String(h.y), isSuspended: "0" });
+  }
 };
 
 /**

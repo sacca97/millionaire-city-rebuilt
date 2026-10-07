@@ -244,3 +244,10 @@ mission-C11-2: DIFFERENT (10 differences, 2 accepted)
 
 - Both need 5 `commerce_pizza` collections. The single-collect mechanism is BLOCKED in C17 (`tools/missions/worker-notes/C17.md`): a seeded, road-connected Pizzeria reports "Customers: 0 / Income $0", so no collect event. Building our own commerce is blocked by the 20-min construction + construction-end notification-click gap (C06/C26). No flow run for C19/C18.
 - C18 is also an alt mission (`altMissions:1` works, see C07/C29).
+
+## H1 (2026-10-08): influence and collect classes, command-level differences
+
+- Bonus (C03, C04, C05): the original completes bonus missions for seeded influence without sending any update_pollmanager of type bonus (its counter is not persisted either). Ours sends bonus <sku> 1 (and 2 for C03) about 2 s after boot. Decide which side is intended (order of PollEvent creation vs item init; docs/missions-influence-plan.md 2.2, risk U).
+- Collect (C17, C19): the original sends update_item new_mode 6 (GIVING_RENT, millis about 42 s) after a commerce collect and returns to mode 4 later; ours goes straight to mode 4 with one update_item (coinsGain 120).
+- Seeded-at-boot checkInfluence: a commerce whose house is already signed at boot makes the original send checkInfluence at boot; ours sends nothing (emission on change only, apps/client/src/game/game.ts:690-692). In-session signing avoids this (used by C13, C14, C17, C19).
+- update_next_rent: the original sends 1-2 more update_next_rent commands after a contract signing or a collect (C13, C14, C17, C19); same class as L3 in docs/missions-haiku-plan.md.

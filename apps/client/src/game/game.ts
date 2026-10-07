@@ -215,6 +215,8 @@ const NO_GAIN = { exp: 0, coins: 0, cash: 0 };
 
 const SELL_BAR_MS = 3000; // StateOnIA SELL_BAR_TIME, reported as the MODE_BUYING time
 
+const GIVING_RENT_MS = 20_000;
+
 export class Game extends Emitter<GameEvents> implements ToolHost {
   readonly world: GameWorld;
   /** Influence, commerce population, HQ connectivity, wonder attributes, double rent (game/economy.ts). */
@@ -306,12 +308,22 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     // did not run offline (GamePlay.java itemAddTime skips isSuspended); houses advance before commerces because the
     // population a commerce sees depends on its houses' catch-up.
     const env = this.advanceEnv();
+    const bootGiving: GameItem[] = [];
+    const bootTransitions: Transition[] = [];
     const order = [...this.itemMap.values()].sort((a, b) => Number(a.isCommerce || a.isClub === true) - Number(b.isCommerce || b.isClub === true));
     for (const item of order) {
       const savedAt = num(item.placed.state.savedAt);
       const wasSuspended = item.placed.suspended;
+      if (item.isCommerce && item.stateId === STATE_ID.RENT && item.mode === RENT_MODE.GIVING_RENT) {
+        bootGiving.push(item); // reported after securityInit below (the original sends it at STATE_RUN_WORLD, with the recomputed baseline)
+        continue;
+      }
       const dt = wasSuspended ? 0 : savedAt > 0 ? Math.max(0, now - savedAt) : 0;
-      this.handleTransitions(advanceItem(item, dt, this.rules, env));
+      // Rent-mode reports of the load-time catch-up go out at STATE_RUN_WORLD, after securityInit (their compValueNow is the recomputed
+      // baseline: oracle C13 mode 5 at boot carries 2,424,000); construction completions keep their own ordering.
+      const transitions = advanceItem(item, dt, this.rules, env);
+      this.handleTransitions(transitions.filter((t) => t.type === "constructionDone"));
+      bootTransitions.push(...transitions.filter((t) => t.type !== "constructionDone"));
       this.syncPlaced(item);
     }
     this.pushSuspension(true);
@@ -320,6 +332,11 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     // UserDataFacade.securityInit runs later, at STATE_RUN_WORLD (DollarsGame.as:1582), i.e. AFTER the recompute above: the baseline is the
     // recomputed value, so the first security snapshot carries compValueGain 0 (oracle runs C31/C26/C12: ORIG 0 vs ours +152,000 before this).
     this.commands.security.init();
+    this.handleTransitions(bootTransitions);
+    for (const item of bootGiving) {
+      this.endGivingRent(item);
+      this.syncPlaced(item);
+    }
     this.checkFourMillions();
     this.refreshNextRent();
   }
@@ -604,7 +621,8 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     let min = Number.POSITIVE_INFINITY;
     let minSid: string | null = null;
     for (const it of this.itemMap.values()) {
-      if (it.stateId !== STATE_ID.RENT) continue;
+      // StateOnRent.needsToBeTrackedForRent (:1057-1060): commerces are never the "next rent"; only houses/clubs in mode RENTING count.
+      if (it.stateId !== STATE_ID.RENT || it.isCommerce) continue;
       if (it.mode === RENT_MODE.GET_RENT) ready = true;
       else if (it.mode === RENT_MODE.RENTING && it.time < min) {
         min = it.time;
@@ -687,6 +705,7 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
   /** Per-frame update: advance the command queue (real time) and the item timers (scaled time). */
   tick(dtMs: number): void {
     this.queue.tick(dtMs);
+    this.tickGivingRent(dtMs);
     const sim = dtMs * this.timeScale;
     this.pushSuspension(); // HQ road connectivity changed (road/item edits invalidate the economy model)
     const env = this.advanceEnv();
@@ -703,6 +722,28 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
       }
     }
     this.emitPopulation();
+  }
+
+  /** sid -> real ms left of a commerce's GIVING_RENT animation (StateOnRent.checkEnd :1720-1732 -> setNextMode). */
+  private readonly givingRent = new Map<string, number>();
+  private tickGivingRent(dtMs: number): void {
+    for (const [sid, left] of this.givingRent) {
+      if (left > dtMs) {
+        this.givingRent.set(sid, left - dtMs);
+        continue;
+      }
+      this.givingRent.delete(sid);
+      const item = this.itemMap.get(sid);
+      if (item) this.endGivingRent(item);
+    }
+  }
+  /** GIVING_RENT -> RENTING for a commerce (StateOnRent.setNextMode :1744-1760); also what a load of a saved mode 6 does (:693 setNextMode(false)). */
+  private endGivingRent(item: GameItem): void {
+    if (item.stateId !== STATE_ID.RENT || item.mode !== RENT_MODE.GIVING_RENT) return;
+    item.mode = RENT_MODE.RENTING;
+    item.time = item.incomeMs;
+    this.send(this.commands.rentMode(item.sid, item.sku, { mode: RENT_MODE.RENTING, time: Math.round(item.time) }, NO_GAIN));
+    this.changed(item);
   }
 
   private readonly lastPopulation = new Map<string, number>();
@@ -1340,8 +1381,12 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     const nextMode = pending ? RENT_MODE.COLLECTIBLE : item.isCommerce ? RENT_MODE.RENTING : RENT_MODE.WAITING_FOR_CONTRACT;
     // StateOnRent.as:770: the report carries the persisted State time, i.e. the remaining abandon countdown (oracle: 3,591,766 after ~8 s).
     const abandonLeftMs = Math.round(Math.max(0, item.time));
-    item.mode = nextMode;
-    item.time = nextMode === RENT_MODE.RENTING ? item.incomeMs : 0;
+    // Commerce: StateOnRent.as:684-695 MODE_GIVING_RENT waits for the ICON_RENT_COLLECT animation (checkEnd) before setNextMode; the
+    // oracle persists mode 6 / time 0 for 10+ s after the collect (mode 4 is only sent later), so the return to RENTING is deferred.
+    const deferNext = item.isCommerce && nextMode === RENT_MODE.RENTING;
+    item.mode = deferNext ? RENT_MODE.GIVING_RENT : nextMode;
+    item.time = deferNext ? 0 : nextMode === RENT_MODE.RENTING ? item.incomeMs : 0;
+    if (deferNext) this.givingRent.set(sid, GIVING_RENT_MS);
     if (!item.isCommerce) item.incomeMs = 0;
     // The contract cost counted in the company value while the contract ran (signContract, StateOnRent.as:567) leaves with it: the oracle's
     // collect reports compValueGain = rent - contract cost (357 - 90 = 267 in the tutorial).
@@ -1353,7 +1398,7 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     if (item.isCommerce) {
       // Commerce: GET_RENT -> GIVING_RENT (6) carries the gain (and doubleRent), then the next mode (SecurityNormal.java:362-400).
       this.send(this.commands.collectRent(sid, sku, { time: 0, collectible: false, ...(doubled ? { doubleRent: true } : {}) }, gained));
-      this.send(this.commands.rentMode(sid, sku, { mode: nextMode, time: Math.round(item.time) }, NO_GAIN));
+      if (!deferNext) this.send(this.commands.rentMode(sid, sku, { mode: nextMode, time: Math.round(item.time) }, NO_GAIN));
     } else {
       this.send(
         this.commands.rentMode(

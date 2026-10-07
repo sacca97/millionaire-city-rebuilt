@@ -46,5 +46,13 @@
  {
   "pattern": "cmds:\\s+#1 /_dat/next_rent: ORIG=-1 OURS=\\d+",
   "reason": "mission-C11-2 only: after a rival purchase the original does not recompute the soonest rent (-1 kept) while ours reports the bought commerce's income time; only the server-side next_rent hint (visitor/friend feature, deferred) differs, no save or gameplay field"
+ },
+ {
+  "pattern": "cmds:\\s+#\\d+ /_dat/next_rent: ORIG=1\\d\\d OURS=1\\d\\d$",
+  "reason": "oracle commerce flows (C13/C14/C17/C19): seconds until the next house rent differ by the wall-clock gap between the two clients' boots/reloads (about 1-30 s); the sequence and count of next_rent commands is compared separately and equal"
+ },
+ {
+  "pattern": "(completed|final)\\.saves\\.json: .*Company\\[houses_\\d+_\\d+@-?\\d+,-?\\d+\\]/Item\\[id1\\]/time: ORIGINAL='\\d{5,6}' OURS='\\d{5,6}'",
+  "reason": "oracle commerce flows: remaining contract/rent countdown (ms) of the customer houses depends on the wall-clock time at which each client's flow takes its dumps and reloads (the original reloads slower); not a logic difference"
  }
 ]

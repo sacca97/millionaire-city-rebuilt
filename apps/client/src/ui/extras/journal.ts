@@ -66,7 +66,9 @@ export function mountJournal(ctx: UiContext): void {
   // The flag is persisted by the million_news_feed command (Profile.as:2114) and read at load (:1224).
   let seen = String(ctx.game.state.profile.raw.millionNewsFeed ?? '0') === '1';
   const check = (cv: number): void => {
-    if (seen || cv < 1_000_000 || popups.isAnyOpen) return;
+    // DollarsGame.mShowPopup is already set while a mission PopupReward is being built (rewardPopupOpen), before it is on the popup stack.
+    const rewardPending = (window as unknown as { __missions?: { manager: { rewardPopupOpen: boolean } } }).__missions?.manager.rewardPopupOpen === true;
+    if (seen || cv < 1_000_000 || popups.isAnyOpen || rewardPending) return;
     seen = true;
     ctx.game.sendCommand(ctx.game.commands.millionNewsFeed());
     void openJournal(ctx, 'magazine');

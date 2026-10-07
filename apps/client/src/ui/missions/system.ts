@@ -100,12 +100,25 @@ export class MissionSystem {
     try {
       const n = (v: string | undefined): number => Number(v ?? 0) || 0;
       checkProfileMissionEvents(this.manager, { coins: n(raw.DCCoins), cash: n(raw.DCCash), companyValue: n(raw.companyValue) });
+      // ItemObject.refresh at world load (ItemObject.as:1333-1338 -> checkInfluenceEvent :2859-2876) runs before STATE_RUN_WORLD: the bonus
+      // thresholds already met by the loaded world count locally and nothing is sent (oracle C03/C04/C05: no update_pollmanager bonus).
+      if (!game.tutorial) this.checkBonus(true);
     } finally {
       this.muteSends = false;
     }
     checkProfileMissionEvents(this.manager, game.profile);
     this.update();
     this.timer = setInterval(() => this.update(), 1000);
+  }
+
+  /** ItemObject.checkInfluenceEvent (:2859-2876): bonus<sku> and bonus<subsku> (houses: <part0>_<part1>, ItemDefinition.as:504-508). */
+  private checkBonus(_atLoad: boolean): void {
+    for (const it of this.game.items()) {
+      const v = this.game.economy.influencePercent(it.sid);
+      this.manager.poll.checkEvent(MISSION_EVENT.bonus + it.sku, v, it.sid);
+      const parts = it.sku.split("_");
+      if (it.sku.startsWith("houses_") && parts.length > 1) this.manager.poll.checkEvent(MISSION_EVENT.bonus + parts[0] + "_" + parts[1], v, it.sid);
+    }
   }
 
   destroy(): void {
@@ -186,12 +199,7 @@ export class MissionSystem {
     // missions); original call sites: attributes changed, state enter, mouse-over refresh. Polled once a second here.
     window.setInterval(() => {
       if (this.visiting || game.tutorial) return;
-      for (const it of game.items()) {
-        const v = game.economy.influencePercent(it.sid);
-        manager.poll.checkEvent(MISSION_EVENT.bonus + it.sku, v, it.sid);
-        const parts = it.sku.split("_"); // ItemDefinition.as:504-508: subsku = <part0>_<part1>
-        if (it.sku.startsWith("houses_") && parts.length > 1) manager.poll.checkEvent(MISSION_EVENT.bonus + parts[0] + "_" + parts[1], v, it.sid);
-      }
+      this.checkBonus(false);
       this.update();
     }, 1000);
     uiBus.on("visitStarted", ({ userId }) => {
