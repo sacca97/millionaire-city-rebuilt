@@ -32,7 +32,7 @@
   <label><input id="curb" type="checkbox" checked> curbs</label>
   <label><input id="dash" type="checkbox" checked> lane dashes</label>
   <label><input id="walk" type="checkbox" checked> crosswalks</label>
-  <label>Bend radius <input id="rad" type="range" min="0" max="16" step="1" value="13"><span class="val" id="radv">13 px</span></label>
+  <label>Bend radius <input id="rad" type="range" min="0" max="16" step="1" value="10"><span class="val" id="radv">10 px</span></label>
   <button id="reset">Reset view</button>
 </header>
 <main>
@@ -86,8 +86,8 @@ function loops() {
 const LOOPS = loops();
 
 function roadPath(S, bendR, concaveR) {
-  // Radii follow the original tiles: only the OUTER corner of a 90-degree bend is round (about 13 px), road ends and straight/T tiles keep
-  // square corners, and concave (inner) corners get a small fillet (about 3 px).
+  // Radii follow the original tiles: only the OUTER corner of a 90-degree bend is round (about 10 px), road ends and straight/T tiles keep
+  // square corners, and concave (inner) corners are square too.
   const path = new Path2D();
   const nbrs = (x, y) => [isRoad(x, y - 1), isRoad(x + 1, y), isRoad(x, y + 1), isRoad(x - 1, y)];
   for (const P of LOOPS) {
@@ -154,7 +154,7 @@ function drawVector() {
   const S = st.zoom * d, ox = st.panX * d, oy = st.panY * d;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#78b83c"; ctx.fillRect(0, 0, cvB.width, cvB.height);
   ctx.setTransform(1, 0, 0, 1, ox, oy);
-  const rad = +el("rad").value, path = roadPath(S, rad, 3);
+  const rad = +el("rad").value, path = roadPath(S, rad, 0);
   ctx.fillStyle = "rgb(71,71,71)"; ctx.fill(path);
   ctx.save(); ctx.clip(path);
   if (el("grain").checked) {
