@@ -59,6 +59,7 @@ export class MissionSystem {
   private visiting = false;
   private updating = false;
   private updatePending = false;
+  private payDeferred = false;
   private lastAlert: MissionAlert = "none";
   /** UserDataFacadeOnline.updatePollManager only sends in STATE_RUN_WORLD (UDFO.as:1712-1720): the load-time checks are local counts. */
   private muteSends = false;
@@ -80,12 +81,25 @@ export class MissionSystem {
       sendMission: (sku, claim) => {
         // MissionObjectManager.as:283 builds the claim object from the stale baseline; the facade then advances it (UDFO.as:1232-1237): no pre-sync.
         game.sendCommand(game.commands.mission(sku, claim));
+        if (this.payDeferred) {
+          // The claim's own update is out: the mission checks the payment triggered run on the next logic update (below).
+          this.payDeferred = false;
+          queueMicrotask(() => this.update());
+        }
       },
       poll: (action, type, parameter, value) => {
         if (this.muteSends) return;
         game.sendCommand(action === "add" ? game.commands.poll("add", type, parameter) : game.commands.poll("update", type, parameter, value ?? "0"));
       },
-      pay: (g: RewardGain) => void game.applyGain({ coins: g.coins, exp: g.exp, cash: g.cash }),
+      pay: (g: RewardGain) => {
+        // Company.delayedPaymentPay only changes the attributes; the earn/level missions react in the NEXT logic update, after the claimed
+        // mission's own updateMissions (oracle R04/R05 g1: the claimed sku is sent first and carries the reward; ours used to send the
+        // reached earn mission first, which consumed the gain, and then the claim again).
+        this.payDeferred = true;
+        void game.applyGain({ coins: g.coins, exp: g.exp, cash: g.cash });
+        // no sendMission followed (defensive): release the deferral.
+        if (!this.updating) queueMicrotask(() => (this.payDeferred = false));
+      },
       addItem: (sku, amount) => game.addStorageItem(sku, amount),
       npcCompanyValue: (i) => opts.npcValues[i] ?? Number.NaN
     };
@@ -133,6 +147,7 @@ export class MissionSystem {
 
   update(): void {
     if (this.visiting) return; // MissionObject.needsToBeChecked: visitor role is not checked
+    if (this.payDeferred) return; // see host.pay
     if (this.updating) {
       this.updatePending = true;
       return;

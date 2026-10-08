@@ -49,3 +49,13 @@ Format: one line per class, newest at the bottom. status = EQUAL | DIFFERENT | I
 | C03 | 25 | mission-C03-25.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C03.md (H1: both give 25; original sends NO bonus poll update, ours sends bonus houses_001 1 and 2; 61 diffs) |
 | C05 | 27 | mission-C05-27.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C05.md (H1: both give 27; only PollManager chunk: ours persists bonushouses_002_001/1, original sends no bonus update) |
 | C04 | 29 | mission-C04-29.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/C04.md (H1: both give 29 (villa 90 pct via 7 fountains); same bonus gap as C05; rep2 99 not run) |
+| C18 | 95 | mission-C18-95.mjs | y | y | 0 | EQUAL | tools/missions/worker-notes/C18.md (altMissions:1, counter shortcut 4 -> 5; 0 differences, 5 accepted) |
+| R04 | 65 g0 | mission-R04-65.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/R04.md (claim update order: unlocked missions sent before claimed sku 65; exp 10000 on sku 11 and 65; mechanism C36) |
+| R04 | 65 g1 | mission-R04-65-g1.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/R04.md (same ordering diff, 33 diffs; final coins equal 2450000) |
+| R04 | 65 g2 | mission-R04-65-g2.mjs | y | n | - | BLOCKED | tools/missions/worker-notes/R04.md (ours: 5 Chromium crashes/fetch failures after claim; infra) |
+| R05 | 61 g0 | mission-R05-61.mjs | y | n | - | BLOCKED | tools/missions/worker-notes/R05.md (ours: 7 infra failures: crashes, screenshot timeouts, SqliteError disk I/O, nav timeout) |
+| R05 | 61 g1 | mission-R05-61-g1.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/R05.md (coins 7470000 credited twice in ours: final coins 16445000 vs 8510000) |
+| R05 | 61 g2 | mission-R05-61-g2.mjs | y | y | 0 | EQUAL | tools/missions/worker-notes/R05.md (0 differences, 3 accepted) |
+| R06 | 66 g0 | mission-R06-66.mjs | y | y | 0 | EQUAL | tools/missions/worker-notes/R06.md (0 differences, 3 accepted) |
+| R06 | 66 g1 | mission-R06-66-g1.mjs | y | y | 1 | DIFFERENT | tools/missions/worker-notes/R06.md (group-1 reward credited twice in ours: DCCoins 1490000 vs 1055000; millionNewsFeed missing) |
+| R06 | 66 g2 | mission-R06-66-g2.mjs | y | y | 0 | EQUAL | tools/missions/worker-notes/R06.md (0 differences, 3 accepted) |
