@@ -28,7 +28,8 @@ export class CityView {
   private overlay = new Container();
   private itemsTop = new Container();
   private views = new Map<string, { view: ItemView; state: ItemStateInput }>();
-  private tiles = new Container();
+  /** The whole 90x60 ground baked into one texture (2D canvas): at fractional zoom separate tile sprites left faint seams between tiles. */
+  private tilesBaked = new Sprite();
   private tileCache = new Map<number, Texture>();
   private tileset?: Texture;
   private ghostGfx = new Graphics();
@@ -50,7 +51,7 @@ export class CityView {
     this.items.sortableChildren = true;
     // Map input is handled on the stage (hitArea); nothing under the world is interactive, so skip the per-pointer-move hit-test traversal.
     this.world.interactiveChildren = false;
-    this.ground.addChild(this.tiles);
+    this.ground.addChild(this.tilesBaked);
     this.world.addChild(this.ground, this.items, this.itemsTop, this.overlay);
     this.ghostGlow.filters = [new BlurFilter({ strength: 5 })];
     this.overlay.addChild(this.ghostGlow, this.ghostGfx);
@@ -87,14 +88,14 @@ export class CityView {
   private async drawGround(state: WorldState): Promise<void> {
     const g = this.ground;
     for (const c of g.removeChildren()) {
-      if (c !== this.tiles) c.destroy();
+      if (c !== this.tilesBaked) c.destroy();
     }
     // Backdrop: terrain.swf "background" clip, origin (0,0) (Background.as:256-259).
     const backdrop = await Assets.load<Texture>("/ground/background.png").catch(() => undefined);
     if (backdrop) {
       g.addChild(new Sprite(backdrop));
     }
-    g.addChild(this.tiles);
+    g.addChild(this.tilesBaked);
     const terrain = new Set<number>();
     const road = new Set<number>();
     for (const [x, y] of state.terrain) {
@@ -114,38 +115,25 @@ export class CityView {
       return;
     }
     const data = computeTileIndices({ cols: MAP_COLS, rows: MAP_ROWS, terrain: sets.terrain as Set<number>, road: sets.roads as Set<number> });
-    for (const c of this.tiles.removeChildren()) {
-      c.destroy({ children: true });
+    // Bake every tile into one canvas at native resolution: one sprite instead of ~5,400, and no inner tile edges to show seams.
+    const res = tileset.source.resource as CanvasImageSource;
+    const canvas = document.createElement("canvas");
+    canvas.width = MAP_COLS * TILE;
+    canvas.height = MAP_ROWS * TILE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
     }
-    this.chunks.clear();
-    const cache = this.tileCache;
     for (let i = 0; i < data.length; i += 1) {
       const idx = tilesetIndex(data[i]);
       if (idx < 0) {
         continue;
       }
-      let tex = cache.get(idx);
-      if (!tex) {
-        tex = new Texture({
-          source: tileset.source,
-          frame: new Rectangle((idx % TILESET_COLS) * TILE, Math.floor(idx / TILESET_COLS) * TILE, TILE, TILE)
-        });
-        cache.set(idx, tex);
-      }
-      const sp = new Sprite(tex);
-      sp.x = (i % MAP_COLS) * TILE;
-      sp.y = Math.floor(i / MAP_COLS) * TILE;
-      const cx = Math.floor((i % MAP_COLS) / CHUNK);
-      const cy = Math.floor(Math.floor(i / MAP_COLS) / CHUNK);
-      const key = cy * 1000 + cx;
-      let chunk = this.chunks.get(key);
-      if (!chunk) {
-        chunk = new Container();
-        this.chunks.set(key, chunk);
-        this.tiles.addChild(chunk);
-      }
-      chunk.addChild(sp);
+      ctx.drawImage(res, (idx % TILESET_COLS) * TILE, Math.floor(idx / TILESET_COLS) * TILE, TILE, TILE, (i % MAP_COLS) * TILE, Math.floor(i / MAP_COLS) * TILE, TILE, TILE);
     }
+    const old = this.tilesBaked.texture;
+    this.tilesBaked.texture = Texture.from(canvas);
+    if (old !== Texture.EMPTY) old.destroy(true);
   }
 
   /** Ground culling chunks (CHUNK x CHUNK tiles each), key = chunkY * 1000 + chunkX. */
