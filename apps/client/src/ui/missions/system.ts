@@ -68,6 +68,8 @@ export class MissionSystem {
   private updating = false;
   private updatePending = false;
   private payDeferred = false;
+  /** Coins paid by mission rewards so far (the load-time claims included): the original pays them AFTER the first logic update, see ui/extras/journal.ts. */
+  paidCoins = 0;
   private lastAlert: MissionAlert = "none";
   /** UserDataFacadeOnline.updatePollManager only sends in STATE_RUN_WORLD (UDFO.as:1712-1720): the load-time checks are local counts. */
   private muteSends = false;
@@ -105,6 +107,7 @@ export class MissionSystem {
         // mission's own updateMissions (oracle R04/R05 g1: the claimed sku is sent first and carries the reward; ours used to send the
         // reached earn mission first, which consumed the gain, and then the claim again).
         this.payDeferred = true;
+        this.paidCoins += g.coins;
         void game.applyGain({ coins: g.coins, exp: g.exp, cash: g.cash });
         // no sendMission followed (defensive): release the deferral.
         if (!this.updating) queueMicrotask(() => (this.payDeferred = false));

@@ -81,7 +81,10 @@ export function mountJournal(ctx: UiContext): void {
   // At load the reward popups of the missions that are reached are not up yet (that is MissionObjectManager.logicUpdate, after this).
   // Oracle C04-29 / C05-27: the magazine command is in the first batch at load. Open question (C03-25): there the original sends none
   // although the company value is also >= 1,000,000 at load; see tools/missions/worker-notes/OPEN-QUESTIONS.md.
-  check(ctx.game.profile.companyValue, true);
+  // In the original the rewards of the missions reached at load are paid after this first check (the first mission commands carry the
+  // value without them: C03-25 952,000 vs 1,072,000 here; C05-27 1,141,000 vs 1,216,000), so subtract what they paid.
+  const paid = (window as unknown as { __missions?: { paidCoins: number } }).__missions?.paidCoins ?? 0;
+  check(ctx.game.profile.companyValue - paid, true);
   ctx.game.on('profile', (pr) => check(pr.companyValue));
   // Profile.logicUpdate keeps mNewCompanyValue (and so repeats the check every frame) until the friends bar knows the player's own
   // neighbour entry (Profile.as:2125-2128): a retry window right after load, then one check per company value change.
