@@ -188,6 +188,19 @@ function drawVector() {
     // inward from the edge: 1 px #2e2e2e, 1 px #555555, 1 px #999999, 1 px #3f3f3f (measured on tileset.png), strokes centred on the edge and clipped
     for (const [w, c] of [[8, "#3f3f3f"], [6, "#999999"], [4, "#555555"], [2, "#2e2e2e"]]) { ctx.lineWidth = w * S; ctx.strokeStyle = c; ctx.lineJoin = "round"; ctx.stroke(path); }
   }
+  if (el("curb").checked) {
+    // the end of a street stays open: paint the asphalt back over the curb that closes a dead-end tile (between the two side curbs, 4 px deep)
+    const T = TILE * S;
+    for (const [x, y] of L.roads) {
+      const n = [isRoad(x, y - 1), isRoad(x + 1, y), isRoad(x, y + 1), isRoad(x - 1, y)];
+      if (n.filter(Boolean).length !== 1) continue;
+      const X = x * T, Y = y * T, k = n.indexOf(true);          // k = side with the neighbour; the end is the opposite side
+      if (k === 3) ctx.fillRect(X + 28 * S, Y + 4 * S, 4 * S, 24 * S);       // end on the right
+      else if (k === 1) ctx.fillRect(X, Y + 4 * S, 4 * S, 24 * S);           // end on the left
+      else if (k === 2) ctx.fillRect(X + 4 * S, Y, 24 * S, 4 * S);           // end at the top
+      else ctx.fillRect(X + 4 * S, Y + 28 * S, 24 * S, 4 * S);               // end at the bottom
+    }
+  }
   ctx.restore();
   if (el("walk").checked) {
     // tileset tiles 1 (horizontal road) and 2 (vertical road): 5 bars of 2 x 10 px, 5 px apart, centred (measured on tileset.png)
