@@ -32,7 +32,7 @@
   <label><input id="curb" type="checkbox" checked> curbs</label>
   <label><input id="dash" type="checkbox" checked> lane dashes</label>
   <label><input id="walk" type="checkbox" checked> crosswalks</label>
-  <label>Corner radius <input id="rad" type="range" min="0" max="16" step="1" value="5"><span class="val" id="radv">5 px</span></label>
+  <label>Bend radius <input id="rad" type="range" min="0" max="16" step="1" value="13"><span class="val" id="radv">13 px</span></label>
   <button id="reset">Reset view</button>
 </header>
 <main>
@@ -85,8 +85,11 @@ function loops() {
 }
 const LOOPS = loops();
 
-function roadPath(S, convexR, concaveR) {
+function roadPath(S, bendR, concaveR) {
+  // Radii follow the original tiles: only the OUTER corner of a 90-degree bend is round (about 13 px), road ends and straight/T tiles keep
+  // square corners, and concave (inner) corners get a small fillet (about 3 px).
   const path = new Path2D();
+  const nbrs = (x, y) => [isRoad(x, y - 1), isRoad(x + 1, y), isRoad(x, y + 1), isRoad(x - 1, y)];
   for (const P of LOOPS) {
     const n = P.length, px = (p) => [p[0] * TILE * S, p[1] * TILE * S];
     const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
@@ -94,8 +97,16 @@ function roadPath(S, convexR, concaveR) {
     path.moveTo(first[0], first[1]);
     for (let i = 0; i < n; i++) {
       const a = P[(i + n - 1) % n], v = P[i], b = P[(i + 1) % n];
-      const cross = (v[0] - a[0]) * (b[1] - v[1]) - (v[1] - a[1]) * (b[0] - v[0]);
-      const r = (cross > 0 ? convexR : concaveR) * S;   // right turn = convex corner of the road region
+      const d1 = [Math.sign(v[0] - a[0]), Math.sign(v[1] - a[1])], d2 = [Math.sign(b[0] - v[0]), Math.sign(b[1] - v[1])];
+      const cross = d1[0] * d2[1] - d1[1] * d2[0];            // > 0: right turn = convex corner of the road region
+      let r = 0;
+      if (cross > 0) {
+        const tx = Math.floor(v[0] - 0.5 * d1[0] + 0.5 * d2[0]), ty = Math.floor(v[1] - 0.5 * d1[1] + 0.5 * d2[1]);
+        const [u, rt, dn, l] = nbrs(tx, ty), count = +u + +rt + +dn + +l;
+        const bend = count === 2 && !((u && dn) || (l && rt));
+        r = bend ? bendR : 0;
+      } else r = concaveR;
+      r *= S;
       const V = px(v), m = mid(V, px(b));
       if (r > 0.01) path.arcTo(V[0], V[1], m[0], m[1], r); else { path.lineTo(V[0], V[1]); path.lineTo(m[0], m[1]); }
     }
@@ -143,7 +154,7 @@ function drawVector() {
   const S = st.zoom * d, ox = st.panX * d, oy = st.panY * d;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#78b83c"; ctx.fillRect(0, 0, cvB.width, cvB.height);
   ctx.setTransform(1, 0, 0, 1, ox, oy);
-  const rad = +el("rad").value, path = roadPath(S, rad, Math.max(2, rad * 0.6));
+  const rad = +el("rad").value, path = roadPath(S, rad, 3);
   ctx.fillStyle = "rgb(71,71,71)"; ctx.fill(path);
   ctx.save(); ctx.clip(path);
   if (el("grain").checked) {
@@ -171,14 +182,21 @@ function drawVector() {
     }
   }
   if (el("dash").checked) {
-    ctx.fillStyle = "#c2c2c2"; // 8 x 1 px dash in the middle of every straight tile (measured on tileset.png)
+    ctx.fillStyle = "#c2c2c2"; // 8 x 1 px dashes every 16 px: one in the tile centre and one across the tile boundary (measured on tileset.png)
+    const th = Math.max(1, 1 * S), len = 8 * S;
     for (const [x, y] of L.roads) {
       const l = isRoad(x - 1, y), r = isRoad(x + 1, y), u = isRoad(x, y - 1), dn = isRoad(x, y + 1);
       const walk = L.indices[y * L.cols + x] === 1 || L.indices[y * L.cols + x] === 2;
       const horiz = !walk && l && r && !(u && dn), vert = !walk && u && dn && !(l && r);
-      const cx = (x + 0.5) * TILE * S, cy = (y + 0.5) * TILE * S, len = 8 * S, th = Math.max(1, 1 * S);
-      if (horiz) ctx.fillRect(cx - len / 2, cy - th / 2, len, th);
-      if (vert) ctx.fillRect(cx - th / 2, cy - len / 2, th, len);
+      const cx = (x + 0.5) * TILE * S, cy = (y + 0.5) * TILE * S, hx = x * TILE * S, hy = y * TILE * S;
+      if (horiz) {
+        ctx.fillRect(cx - len / 2, cy - th / 2, len, th);
+        if (isRoad(x - 1, y)) ctx.fillRect(hx - len / 2, cy - th / 2, len, th); // dash across the left boundary
+      }
+      if (vert) {
+        ctx.fillRect(cx - th / 2, cy - len / 2, th, len);
+        if (isRoad(x, y - 1)) ctx.fillRect(cx - th / 2, hy - len / 2, th, len);
+      }
     }
   }
 }
