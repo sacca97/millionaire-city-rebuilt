@@ -18,8 +18,15 @@ for f in sorted(glob.glob('tools/missions/evidence/*.json')):
     ours_old = [d for d in dirs if d not in orig]
     if not want and all(os.path.exists(d) for d in dirs):
         continue
+    stable = 'tools/oracle/out/flow-' + e['flow']
     if len(orig) != 1 or not os.path.exists(orig[0]):
-        print('SKIP no original dir', e['flow']); continue
+        orig = [stable]
+        if not os.path.exists(os.path.join(stable, 'final.saves.json')):
+            # the original's dumps are gone (e.g. /tmp was wiped): run the ORIGINAL client again
+            oenv = dict(os.environ, FLOW=e['flow'], MCITY_ORACLE_PORT_BASE=str(32000 + port % 1000))
+            subprocess.run(['node', 'tools/oracle/run.mjs', 'flow'], env=oenv, capture_output=True, text=True, timeout=900)
+            if not os.path.exists(os.path.join(stable, 'final.saves.json')):
+                print('FAILED original run', e['flow'], flush=True); continue
     out = os.path.join(root, 'tools/oracle/out/ours-' + e['flow'])
     ok = False
     for attempt in range(3):

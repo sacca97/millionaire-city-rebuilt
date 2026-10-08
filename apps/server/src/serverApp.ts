@@ -259,7 +259,7 @@ export function createServerApp(config = getServerConfig()): ServerApp {
       return;
     }
 
-    res.type("application/xml").send(patchedXml);
+    res.type("application/xml").set("Cache-Control", "public, max-age=3600").send(patchedXml);
   });
 
   app.get("/mcity/0.501/Datas/userData/fan.xml", (_req, res) => {
@@ -650,7 +650,8 @@ function createCaseInsensitiveAssetMiddleware(config: ServerConfig): express.Req
     if (resolvedPath !== exactPath) {
       console.warn(`[mcity] Resolved asset case mismatch: ${req.originalUrl}`);
     }
-    res.sendFile(resolvedPath);
+    // Static game data (rules, locale, tilesets): cache for a day (ETag/Last-Modified still revalidate), it was max-age=0 before.
+    res.sendFile(resolvedPath, { maxAge: "1d" });
   };
 }
 

@@ -10,11 +10,26 @@ import { CityView } from "./view/city";
 import { SpriteLibrary } from "./view/sprites";
 import { TrafficView } from "./view/traffic";
 
+/** Fill cost grows with resolution squared (2x costs 3.6x per frame in the perf review): cap it; the UI text is DOM and stays sharp. */
+const MAX_RESOLUTION = 1.5;
+/** After this long without input the map renders at IDLE_FPS (cars and decorations still animate smoothly enough). */
+const IDLE_AFTER_MS = 4000;
+const IDLE_FPS = 30;
+
 async function boot(): Promise<void> {
   const host = document.getElementById("game")!;
   const app = new Application();
-  await app.init({ resizeTo: window, background: 0x1d2a1f, antialias: false, resolution: window.devicePixelRatio || 1, autoDensity: true });
+  await app.init({ resizeTo: window, background: 0x1d2a1f, antialias: false, resolution: Math.min(window.devicePixelRatio || 1, MAX_RESOLUTION), autoDensity: true });
   host.appendChild(app.canvas);
+  let lastInput = Date.now();
+  const touch = (): void => {
+    lastInput = Date.now();
+    app.ticker.maxFPS = 0; // uncapped (display refresh) while the player interacts
+  };
+  for (const ev of ["pointerdown", "pointermove", "wheel", "keydown", "touchstart"]) window.addEventListener(ev, touch, { passive: true });
+  window.setInterval(() => {
+    if (Date.now() - lastInput > IDLE_AFTER_MS && app.ticker.maxFPS !== IDLE_FPS) app.ticker.maxFPS = IDLE_FPS;
+  }, 1000);
 
   // keepalive lets the last queued commands survive a page unload (see pagehide handler below).
   const conn = new GameConnection({ fetchFn: (input, init) => fetch(input, { ...init, keepalive: true }) });

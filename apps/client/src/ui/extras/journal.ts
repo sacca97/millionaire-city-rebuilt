@@ -60,22 +60,31 @@ export async function openJournal(ctx: UiContext, type: 'news' | 'magazine'): Pr
   return p;
 }
 
+/** Approximation of 'until the friends bar has loaded' (see mountJournal). */
+const RETRY_WINDOW_MS = 8000;
+
 export function mountJournal(ctx: UiContext): void {
   uiBus.on('openNews', () => void openJournal(ctx, 'news'));
   // Magazine: Profile.logicUpdate :2110 - company value >= 1M, profile flag millionNewsFeed unset, no popup open.
   // The flag is persisted by the million_news_feed command (Profile.as:2114) and read at load (:1224).
   let seen = String(ctx.game.state.profile.raw.millionNewsFeed ?? '0') === '1';
-  const check = (cv: number): void => {
+  const check = (cv: number, atLoad = false): void => {
     // DollarsGame.mShowPopup is already set while a mission PopupReward is being built (rewardPopupOpen), before it is on the popup stack.
     const rewardPending = (window as unknown as { __missions?: { manager: { rewardPopupOpen: boolean } } }).__missions?.manager.rewardPopupOpen === true;
-    if (seen || cv < 1_000_000 || popups.isAnyOpen || rewardPending) return;
+    if (seen || cv < 1_000_000 || popups.isAnyOpen || (rewardPending && !atLoad)) return;
     seen = true;
     ctx.game.sendCommand(ctx.game.commands.millionNewsFeed());
     void openJournal(ctx, 'magazine');
   };
   // Profile.logicUpdate runs before MissionObjectManager.logicUpdate in the first frame of the world (DollarsGame.as:1943 vs 2020): the
   // check at load precedes the reward popups of the missions that become reached at load (oracle R04-65-g1 / R05-61-g1).
-  check(ctx.game.profile.companyValue);
+  // At load the reward popups of the missions that are reached are not up yet (that is MissionObjectManager.logicUpdate, after this).
+  // Oracle C04-29 / C05-27: the magazine command is in the first batch at load. Open question (C03-25): there the original sends none
+  // although the company value is also >= 1,000,000 at load; see tools/missions/worker-notes/OPEN-QUESTIONS.md.
+  check(ctx.game.profile.companyValue, true);
   ctx.game.on('profile', (pr) => check(pr.companyValue));
-  setInterval(() => check(ctx.game.profile.companyValue), 2000);
+  // Profile.logicUpdate keeps mNewCompanyValue (and so repeats the check every frame) until the friends bar knows the player's own
+  // neighbour entry (Profile.as:2125-2128): a retry window right after load, then one check per company value change.
+  const retry = setInterval(() => check(ctx.game.profile.companyValue), 1000);
+  setTimeout(() => clearInterval(retry), RETRY_WINDOW_MS);
 }

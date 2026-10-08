@@ -220,23 +220,14 @@ export class Shop {
 
   private async renderCards(cards: ShopCard[], page: number): Promise<void> {
     const gen = ++this.renderGen;
-    const views = await Promise.all(cards.map((c) => createCard(c, this.handlers)));
-    if (gen !== this.renderGen || !this.inner) {
-      views.forEach((v) => v.destroy());
-      return;
-    }
+    if (!this.inner) return;
+    // Only the current page and its neighbours are built (a tab can hold 100+ cards, each a DOM widget with images and filters);
+    // pageTo/ensureBuilt create the others on demand.
     this.views.forEach((v) => v.destroy());
-    this.views = views;
-    // ItemContentUnlocked.start (:96-103): during the tutorial only the Bungalow / first decoration can be bought
-    const tut = this.ctx.game.tutorial;
-    if (tut?.active) for (const v of views) if (v.button && !tut.shopBuyAllowed(v.card.item.sku)) v.button.disable();
+    this.views = [];
+    this.built.clear();
+    this.cards = cards;
     this.inner.textContent = '';
-    views.forEach((v, i) => {
-      const s = slotOf(i);
-      // viewport origin == slot 0 (scrollRect starts at XINIT/YINIT)
-      v.widget.root.style.transform = `translate(${s.x - GRID.xInit}px,${s.y - GRID.yInit}px)`;
-      this.inner!.appendChild(v.widget.root);
-    });
     this.maxPages = pageCount(cards.length);
     this.page = Math.min(page, this.maxPages - 1);
     this.inner.style.transition = 'none';
@@ -244,7 +235,37 @@ export class Shop {
     void this.inner.offsetWidth;
     this.inner.style.transition = `transform ${SCROLL_MS}ms linear`;
     this.updateArrows();
+    await this.ensureBuilt(this.page, gen);
   }
+
+  /** Builds the card widgets of pages page-1..page+1 that do not exist yet. */
+  private async ensureBuilt(page: number, gen = this.renderGen): Promise<void> {
+    const first = Math.max(0, page - 1) * ITEMS_PER_PAGE;
+    const last = Math.min(this.cards.length, (page + 2) * ITEMS_PER_PAGE);
+    const todo: number[] = [];
+    for (let i = first; i < last; i += 1) if (!this.built.has(i)) {
+      this.built.add(i);
+      todo.push(i);
+    }
+    if (todo.length === 0) return;
+    const views = await Promise.all(todo.map((i) => createCard(this.cards[i], this.handlers)));
+    if (gen !== this.renderGen || !this.inner) {
+      views.forEach((v) => v.destroy());
+      return;
+    }
+    // ItemContentUnlocked.start (:96-103): during the tutorial only the Bungalow / first decoration can be bought
+    const tut = this.ctx.game.tutorial;
+    views.forEach((v, n) => {
+      if (tut?.active && v.button && !tut.shopBuyAllowed(v.card.item.sku)) v.button.disable();
+      const s = slotOf(todo[n]);
+      // viewport origin == slot 0 (scrollRect starts at XINIT/YINIT)
+      v.widget.root.style.transform = `translate(${s.x - GRID.xInit}px,${s.y - GRID.yInit}px)`;
+      this.inner!.appendChild(v.widget.root);
+      this.views.push(v);
+    });
+  }
+  private cards: ShopCard[] = [];
+  private built = new Set<number>();
   private renderGen = 0;
 
   /** BuyBox.pageLeft/pageRight + checkScrollEnable. */
@@ -253,6 +274,7 @@ export class Shop {
     this.page = p;
     this.inner.style.transform = `translateX(${-p * PAGE_W}px)`;
     this.updateArrows();
+    void this.ensureBuilt(p);
   }
 
   private updateArrows(): void {

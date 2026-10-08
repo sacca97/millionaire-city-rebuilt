@@ -40,7 +40,7 @@
   "reason": "same cause as the update_next_rent count line (pagehide flush)"
  },
  {
-  "pattern": "(completed|final)\\.saves\\.json: .*Company\\[commerce_pizza@-?\\d+,-?\\d+\\]/Item\\[id0\\]/time: ORIGINAL='1[01]\\d{5}' OURS='1[01]\\d{5}'",
+  "pattern": "(completed|final)\\.saves\\.json: .*Company\\[commerce_pizza@-?\\d+,-?\\d+\\]/Item\\[id0\\]/time: ORIGINAL='1[0-2]\\d{5}' OURS='1[0-2]\\d{5}'",
   "reason": "mission-C06-9 only: remaining construction countdown (about 1.1-1.2 million ms) of freshly placed pizzerias depends on the wall-clock time at which each client's flow takes the dumps and reloads; not a logic difference"
  },
  {
