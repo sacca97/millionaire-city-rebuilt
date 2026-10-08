@@ -4,7 +4,6 @@ PORT ?= 31803
 DB ?= $(HOME)/mcity.sqlite
 # OPT: auto = use apps/client/public-opt when it exists; 1 = force optimised assets; 0 = original assets
 OPT ?= auto
-WORKSPACES = --workspace @mcity/shared --workspace @mcity/rules --workspace @mcity/server --workspace @mcity/client --include-workspace-root
 
 .PHONY: help install build run dev test typecheck check clean bundle bundle-small app app-stage missions-status
 
@@ -22,7 +21,7 @@ help:
 	@echo "make clean         remove build output"
 
 install:
-	npm ci $(WORKSPACES)
+	npm ci
 
 build:
 	npm run build -w @mcity/shared
@@ -56,7 +55,7 @@ bundle-small:
 	tools/make-bundle.sh mcity-rewrite-bundle-small.zip --small
 
 app:
-	cd tools/app && npm install --no-audit --no-fund && node build.mjs --pack
+	npm --prefix tools/app ci && node tools/app/build.mjs --pack
 
 app-stage:
 	node tools/app/build.mjs

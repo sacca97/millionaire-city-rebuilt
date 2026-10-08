@@ -81,3 +81,6 @@ apps/client/public-bak/
 
 # machine-specific evidence (absolute /tmp paths and hashes); regenerate with tools/missions/verify.py
 tools/missions/evidence/
+
+# desktop bundle build output
+tools/app/stage/

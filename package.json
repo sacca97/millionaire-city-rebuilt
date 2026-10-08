@@ -2,43 +2,28 @@
   "name": "millionaire-city-private-server",
   "private": true,
   "version": "0.1.0",
-  "description": "Private server and desktop launcher for Millionaire City 0.501",
-  "main": "apps/desktop/dist/main.js",
+  "description": "Millionaire City (TypeScript rewrite): game server, web client and desktop packaging",
   "author": "Millionaire City Revival contributors",
   "workspaces": [
-    "apps/*",
+    "apps/client",
+    "apps/server",
     "packages/*"
   ],
   "scripts": {
-    "prebuild": "node scripts/checkDependencies.cjs tsc",
-    "build": "npm run build -w @mcity/shared && npm run build -w @mcity/server && npm run build -w @mcity/desktop",
-    "predev:server": "node scripts/checkDependencies.cjs tsc tsx",
     "dev:server": "npm run dev -w @mcity/server",
-    "predev:desktop": "node scripts/checkDependencies.cjs tsc electron",
-    "dev:desktop": "npm run dev -w @mcity/desktop",
-    "preprepare-client": "node scripts/checkDependencies.cjs tsx",
-    "prepare-client": "npm run prepare-client -w @mcity/server",
-    "prepare-runtime": "node scripts/prepareReleaseRuntime.cjs",
-    "prepackage:win": "node scripts/checkDependencies.cjs tsc tsx",
-    "package:win": "npm run prepare-client && npm run prepare-runtime && npm run build && npx --yes electron-builder@26.8.1 --win zip --x64 --publish never",
-    "prepackage:win:dir": "node scripts/checkDependencies.cjs tsc tsx",
-    "package:win:dir": "npm run prepare-client && npm run prepare-runtime && npm run build && npx --yes electron-builder@26.8.1 --win dir --x64 --publish never",
-    "prepackage:linux": "node scripts/checkDependencies.cjs tsc tsx",
-    "package:linux": "npm run prepare-client && npm run prepare-runtime && npm run build && npx --yes electron-builder@26.8.1 --linux zip --x64 --publish never",
-    "prepackage:mac": "node scripts/checkDependencies.cjs tsc tsx",
-    "package:mac": "npm run prepare-client && npm run prepare-runtime && npm run build && npx --yes electron-builder@26.8.1 --mac zip --x64 --publish never",
-    "prepackage:mac:x64": "node scripts/checkDependencies.cjs tsc tsx",
-    "package:mac:x64": "npm run prepare-client && npm run prepare-runtime && npm run build && npx --yes electron-builder@26.8.1 --mac zip --x64 --publish never",
-    "report:missing-assets": "npm run report:missing-assets -w @mcity/server",
-    "pretest": "node scripts/checkDependencies.cjs tsc vitest",
-    "test": "npm run test -w @mcity/server",
-    "typecheck": "npx tsc -b packages/shared/tsconfig.json apps/server/tsconfig.json apps/desktop/tsconfig.json --pretty false",
-    "lint:unused": "npx knip --no-progress --workspace @mcity/server --workspace @mcity/desktop --workspace @mcity/shared --include files,exports --include-entry-exports",
-    "lint:cycles": "npx madge --extensions ts --circular apps/server/src apps/desktop/src packages/shared/src",
     "dev:client": "npm run dev -w @mcity/client",
+    "dev:desktop": "npm --prefix tools/app ci && npm --prefix tools/app run start",
+    "build": "npm run build:client",
     "build:client": "npm run build -w @mcity/shared && npm run build -w @mcity/client",
-    "start:rewrite": "npm run build:client && npm run dev:server",
-    "test:rewrite": "npm run test -w @mcity/client && npm run test -w @mcity/server && npm run test -w @mcity/rules"
+    "start": "npm run build:client && npm run dev:server",
+    "test": "npm run test -w @mcity/client && npm run test -w @mcity/server && npm run test -w @mcity/rules",
+    "typecheck": "npm run typecheck -w @mcity/client",
+    "package:win": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --win --x64",
+    "package:linux": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --linux --x64",
+    "package:mac": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --mac",
+    "package:mac:arm64": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --mac --arm64",
+    "package:mac:x64": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --mac --x64",
+    "report:missing-assets": "npm run report:missing-assets -w @mcity/server"
   },
   "dependencies": {
     "@mcity/shared": "^0.1.0",
@@ -46,61 +31,10 @@
     "express": "^4.22.2",
     "selfsigned": "^3.0.1"
   },
-  "build": {
-    "appId": "com.millionairecity.rebuilt",
-    "productName": "Millionaire City Rebuilt",
-    "executableName": "Millionaire City Rebuilt",
-    "electronVersion": "10.4.7",
-    "asar": false,
-    "npmRebuild": false,
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "package.json",
-      "apps/desktop/dist/**/*",
-      "apps/desktop/assets/**/*",
-      "apps/server/dist/**/*",
-      "apps/server/assets/**/*",
-      "packages/shared/package.json",
-      "packages/shared/dist/**/*",
-      "assets/**/*",
-      "generated/client/**/*",
-      "generated/runtime/**/*"
-    ],
-    "win": {
-      "icon": "apps/desktop/assets/window-icon.ico",
-      "target": [
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "MillionaireCityRebuilt-${version}-portable-win-${arch}.${ext}"
-    },
-    "linux": {
-      "icon": "apps/desktop/assets/window-icon.png",
-      "target": [
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "category": "Game",
-      "artifactName": "MillionaireCityRebuilt-${version}-portable-linux-${arch}.${ext}"
-    },
-    "mac": {
-      "target": [
-        {
-          "target": "zip"
-        }
-      ],
-      "identity": null,
-      "artifactName": "MillionaireCityRebuilt-${version}-portable-mac-${arch}.${ext}"
-    }
+  "engines": {
+    "node": ">=22.12"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
   }
 }

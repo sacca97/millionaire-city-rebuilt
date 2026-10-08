@@ -5,16 +5,48 @@
   "description": "Millionaire City (TypeScript rewrite) desktop bundle",
   "main": "main.cjs",
   "author": "Millionaire City Revival contributors",
-  "scripts": { "build": "node build.mjs", "dist": "node build.mjs --pack" },
-  "devDependencies": { "electron": "^33.2.0", "electron-builder": "^25.1.8" },
+  "scripts": {
+    "ensure-electron": "node ensure-electron.cjs",
+    "prestart": "npm run ensure-electron",
+    "start": "node build.mjs && electron stage",
+    "build": "node build.mjs",
+    "dist": "npm run ensure-electron && node build.mjs --pack"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3"
+  },
   "build": {
     "appId": "com.millionairecity.rebuilt.app",
     "productName": "Millionaire City",
     "asar": false,
     "npmRebuild": false,
-    "directories": { "app": "stage", "output": "release" },
-    "linux": { "target": ["zip"], "category": "Game", "artifactName": "MillionaireCity-${version}-linux-${arch}.${ext}" },
-    "win": { "target": ["zip"], "artifactName": "MillionaireCity-${version}-win-${arch}.${ext}" },
-    "mac": { "target": ["zip"], "identity": null, "artifactName": "MillionaireCity-${version}-mac-${arch}.${ext}" }
+    "directories": {
+      "app": "stage",
+      "output": "release"
+    },
+    "linux": {
+      "target": [
+        "zip"
+      ],
+      "category": "Game",
+      "artifactName": "MillionaireCity-${version}-linux-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        "zip"
+      ],
+      "artifactName": "MillionaireCity-${version}-win-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        "zip"
+      ],
+      "identity": null,
+      "artifactName": "MillionaireCity-${version}-mac-${arch}.${ext}"
+    }
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

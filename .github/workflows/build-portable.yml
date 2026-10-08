@@ -3,9 +3,6 @@ name: Build Portable Apps
 on:
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   build:
     name: Build ${{ matrix.label }}
@@ -17,15 +14,19 @@ jobs:
           - label: Windows x64
             os: windows-latest
             package_script: package:win
-            artifact_name: portable-windows-x64
+            artifact_name: millionaire-city-windows-x64
           - label: Linux x64
             os: ubuntu-latest
             package_script: package:linux
-            artifact_name: portable-linux-x64
+            artifact_name: millionaire-city-linux-x64
+          - label: macOS Apple Silicon
+            os: macos-latest
+            package_script: package:mac:arm64
+            artifact_name: millionaire-city-macos-arm64
           - label: macOS Intel x64
             os: macos-15-intel
             package_script: package:mac:x64
-            artifact_name: portable-macos-x64
+            artifact_name: millionaire-city-macos-x64
 
     steps:
       - name: Check out repository
@@ -34,63 +35,55 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
+          cache-dependency-path: |
+            package-lock.json
+            tools/app/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build portable package
+      - name: Build desktop package
         run: npm run ${{ matrix.package_script }}
 
-      - name: Smoke-test packaged macOS backend
-        if: runner.os == 'macOS'
+      - name: Smoke-test the staged game server
         shell: bash
         run: |
-          app_root="release/mac/Millionaire City Rebuilt.app/Contents/Resources/app"
-          node_path="$app_root/generated/runtime/node/darwin-x64/node"
-          flash_path="$app_root/apps/desktop/assets/flash/PepperFlashPlayer.plugin/Contents/MacOS/PepperFlashPlayer"
+          stage="tools/app/stage"
+          node_path="$stage/runtime/node/node"
+          [ -x "$node_path" ] || node_path="$stage/runtime/node/node.exe"
           smoke_log="$RUNNER_TEMP/mcity-backend-smoke.log"
-
-          test -x "$node_path"
-          test -x "$flash_path"
 
           MCITY_DB_PATH="$RUNNER_TEMP/mcity-smoke.sqlite" \
           MCITY_DISABLE_FB_SHIM=1 \
           MCITY_HTTP_PORT=0 \
           MCITY_HTTPS_PORT=0 \
-          "$node_path" "$app_root/apps/server/dist/main.js" >"$smoke_log" 2>&1 &
+          "$node_path" "$stage/apps/server/dist/main.js" >"$smoke_log" 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
 
-          for attempt in {1..20}; do
+          for attempt in {1..30}; do
             if grep -q "Launcher available" "$smoke_log"; then
               kill "$server_pid"
-              wait "$server_pid"
+              wait "$server_pid" || true
               trap - EXIT
               exit 0
             fi
             if ! kill -0 "$server_pid" 2>/dev/null; then
               cat "$smoke_log"
-              wait "$server_pid"
               exit 1
             fi
             sleep 1
           done
 
           cat "$smoke_log"
-          echo "Packaged backend did not become ready in time."
+          echo "The staged backend did not become ready in time."
           exit 1
 
-      - name: Upload portable package
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: release/*.zip
+          path: tools/app/release/*.zip
           if-no-files-found: error

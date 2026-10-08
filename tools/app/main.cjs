@@ -58,8 +58,9 @@ async function start() {
     stdio: ["ignore", logFile, logFile],
     windowsHide: true
   });
-  server.on("exit", (code) => {
-    if (!app.isQuitting) dialog.showErrorBox("Millionaire City", `The game server stopped (code ${code}). See server.log in ${app.getPath("userData")}.`);
+  server.on("exit", (code, signal) => {
+    const how = code !== null ? `code ${code}` : `signal ${signal}`;
+    if (!app.isQuitting) dialog.showErrorBox("Millionaire City", `The game server stopped (${how}). See server.log in ${app.getPath("userData")}.`);
     app.quit();
   });
   await waitReady(port, 60000);
