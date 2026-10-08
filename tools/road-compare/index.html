@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Road comparer: original tiles vs vector roads</title>
+<style>
+  :root { color-scheme: dark; --bg:#14181d; --panel:#1d232b; --text:#e6edf3; --muted:#9aa7b4; --accent:#4cc38a; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, sans-serif; display:flex; flex-direction:column; height:100vh; }
+  header { padding:10px 16px; background:var(--panel); display:flex; flex-wrap:wrap; gap:8px 20px; align-items:center; border-bottom:1px solid #2b333d; }
+  header h1 { font-size:15px; margin:0 8px 0 0; font-weight:650; }
+  label { display:inline-flex; gap:6px; align-items:center; color:var(--muted); white-space:nowrap; }
+  input[type=range] { width:160px; accent-color:var(--accent); }
+  .val { color:var(--text); min-width:3.2em; display:inline-block; font-variant-numeric:tabular-nums; }
+  main { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:2px; min-height:0; background:#000; }
+  .pane { position:relative; min-width:0; min-height:0; background:#78b83c; overflow:hidden; cursor:grab; }
+  .pane.drag { cursor:grabbing; }
+  canvas { display:block; width:100%; height:100%; }
+  .tag { position:absolute; left:10px; top:10px; padding:3px 9px; border-radius:999px; background:rgba(0,0,0,.55); color:#fff; font-size:12px; pointer-events:none; }
+  footer { padding:6px 16px; background:var(--panel); color:var(--muted); font-size:12px; border-top:1px solid #2b333d; }
+  button { background:#2b333d; color:var(--text); border:1px solid #3a4553; border-radius:6px; padding:4px 10px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  @media (max-width:760px) { main { grid-template-columns:1fr; grid-template-rows:1fr 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Roads: original tiles vs vector</h1>
+  <label>Zoom <input id="zoom" type="range" min="0.5" max="6" step="0.05" value="1.5"><span class="val" id="zoomv">1.5x</span></label>
+  <label><input id="grain" type="checkbox" checked> asphalt grain</label>
+  <label><input id="curb" type="checkbox" checked> curbs</label>
+  <label><input id="dash" type="checkbox" checked> lane dashes</label>
+  <label><input id="walk" type="checkbox" checked> crosswalks</label>
+  <label>Corner radius <input id="rad" type="range" min="0" max="16" step="1" value="5"><span class="val" id="radv">5 px</span></label>
+  <button id="reset">Reset view</button>
+</header>
+<main>
+  <div class="pane" id="paneA"><canvas id="a"></canvas><span class="tag">Original tiles (tileset.png, bitmap)</span></div>
+  <div class="pane" id="paneB"><canvas id="b"></canvas><span class="tag">Vector redraw (canvas paths)</span></div>
+</main>
+<footer>Drag to pan (both panes move together), wheel or slider to zoom. Tiles are 32 px; the original panes use smooth scaling like the game. The original pane shows thin seams between tiles at fractional zoom; the game now bakes the ground into one texture to avoid them.</footer>
+
+<script src="layout.js"></script>
+<script>
+const L = window.LAYOUT, TILE = 32, TS_COLS = 16;
+const tileset = new Image();
+tileset.src = "../../assets/dchoc1-a.akamaihd.net/0.501/mcity/Datas/Assets/terrain/tiles/tileset.png";
+
+const roadAt = new Set(L.roads.map(([x, y]) => x + "," + y));
+const isRoad = (x, y) => roadAt.has(x + "," + y);
+
+// ---- outline of the road region: boundary edges with the road on the right-hand side, chained into loops ----
+function loops() {
+  const edges = new Map(); // "x,y" -> [[x,y],...] outgoing edges
+  const add = (a, b) => { const k = a[0] + "," + a[1]; (edges.get(k) || edges.set(k, []).get(k)).push(b); };
+  for (const [x, y] of L.roads) {
+    if (!isRoad(x, y - 1)) add([x, y], [x + 1, y]);
+    if (!isRoad(x + 1, y)) add([x + 1, y], [x + 1, y + 1]);
+    if (!isRoad(x, y + 1)) add([x + 1, y + 1], [x, y + 1]);
+    if (!isRoad(x - 1, y)) add([x, y + 1], [x, y]);
+  }
+  const out = [];
+  while (edges.size) {
+    const [k0, list0] = edges.entries().next().value;
+    const start = k0.split(",").map(Number);
+    let cur = start; const pts = [start];
+    for (let guard = 0; guard < 10000; guard++) {
+      const k = cur[0] + "," + cur[1];
+      const list = edges.get(k);
+      if (!list || !list.length) break;
+      const next = list.shift();
+      if (!list.length) edges.delete(k);
+      if (next[0] === start[0] && next[1] === start[1]) break;
+      pts.push(next); cur = next;
+    }
+    // drop collinear vertices
+    const v = pts.filter((p, i) => {
+      const a = pts[(i + pts.length - 1) % pts.length], b = pts[(i + 1) % pts.length];
+      return (p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0]) !== 0;
+    });
+    if (v.length >= 3) out.push(v);
+  }
+  return out;
+}
+const LOOPS = loops();
+
+function roadPath(S, convexR, concaveR) {
+  const path = new Path2D();
+  for (const P of LOOPS) {
+    const n = P.length, px = (p) => [p[0] * TILE * S, p[1] * TILE * S];
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const first = mid(px(P[n - 1]), px(P[0]));
+    path.moveTo(first[0], first[1]);
+    for (let i = 0; i < n; i++) {
+      const a = P[(i + n - 1) % n], v = P[i], b = P[(i + 1) % n];
+      const cross = (v[0] - a[0]) * (b[1] - v[1]) - (v[1] - a[1]) * (b[0] - v[0]);
+      const r = (cross > 0 ? convexR : concaveR) * S;   // right turn = convex corner of the road region
+      const V = px(v), m = mid(V, px(b));
+      if (r > 0.01) path.arcTo(V[0], V[1], m[0], m[1], r); else { path.lineTo(V[0], V[1]); path.lineTo(m[0], m[1]); }
+    }
+    path.closePath();
+  }
+  return path;
+}
+
+// ---- state ----
+const st = { zoom: 1.5, panX: 40, panY: 30 };
+const el = (id) => document.getElementById(id);
+const cvA = el("a"), cvB = el("b");
+
+function fit(cv) {
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return d;
+}
+
+function drawOriginal() {
+  const d = fit(cvA), ctx = cvA.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#78b83c"; ctx.fillRect(0, 0, cvA.width, cvA.height);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  const S = st.zoom * d, ox = st.panX * d, oy = st.panY * d;
+  for (let i = 0; i < L.indices.length; i++) {
+    const idx = L.indices[i]; if (idx < 0) continue;
+    const x = i % L.cols, y = Math.floor(i / L.cols);
+    ctx.drawImage(tileset, (idx % TS_COLS) * TILE, Math.floor(idx / TS_COLS) * TILE, TILE, TILE, ox + x * TILE * S, oy + y * TILE * S, TILE * S, TILE * S);
+  }
+}
+
+function noisePattern(ctx, cell) {
+  const n = document.createElement("canvas"); n.width = n.height = 256;
+  const c = n.getContext("2d"); const id = c.createImageData(256, 256);
+  for (let i = 0; i < id.data.length; i += 4) { const v = 128 + (Math.random() - 0.5) * 60; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; }
+  c.putImageData(id, 0, 0);
+  const small = document.createElement("canvas"); small.width = small.height = Math.max(32, Math.round(256 * cell / 2));
+  const sc = small.getContext("2d"); sc.imageSmoothingEnabled = false; sc.drawImage(n, 0, 0, small.width, small.height);
+  return ctx.createPattern(small, "repeat");
+}
+
+function drawVector() {
+  const d = fit(cvB), ctx = cvB.getContext("2d");
+  const S = st.zoom * d, ox = st.panX * d, oy = st.panY * d;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#78b83c"; ctx.fillRect(0, 0, cvB.width, cvB.height);
+  ctx.setTransform(1, 0, 0, 1, ox, oy);
+  const rad = +el("rad").value, path = roadPath(S, rad, Math.max(2, rad * 0.6));
+  ctx.fillStyle = "rgb(71,71,71)"; ctx.fill(path);
+  ctx.save(); ctx.clip(path);
+  if (el("grain").checked) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 0.16; ctx.globalCompositeOperation = "overlay";
+    ctx.fillStyle = noisePattern(ctx, Math.max(1, S / 2)); ctx.fillRect(0, 0, cvB.width, cvB.height);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over"; ctx.setTransform(1, 0, 0, 1, ox, oy);
+  }
+  if (el("curb").checked) {
+    // inward from the edge: 1 px #2e2e2e, 1 px #555555, 1 px #999999, 1 px #3f3f3f (measured on tileset.png), strokes centred on the edge and clipped
+    for (const [w, c] of [[8, "#3f3f3f"], [6, "#999999"], [4, "#555555"], [2, "#2e2e2e"]]) { ctx.lineWidth = w * S; ctx.strokeStyle = c; ctx.lineJoin = "round"; ctx.stroke(path); }
+  }
+  ctx.restore();
+  if (el("walk").checked) {
+    // tileset tiles 1 (horizontal road) and 2 (vertical road): 5 bars of 2 x 10 px, 5 px apart, centred (measured on tileset.png)
+    ctx.fillStyle = "#c2c2c2";
+    for (let i = 0; i < L.indices.length; i++) {
+      const t = L.indices[i]; if (t !== 1 && t !== 2) continue;
+      const x = (i % L.cols) * TILE, y = Math.floor(i / L.cols) * TILE;
+      for (let k = 0; k < 5; k++) {
+        const o = 5 + k * 5;
+        if (t === 2) ctx.fillRect((x + o) * S, (y + 10) * S, 2 * S, 10 * S);
+        else ctx.fillRect((x + 10) * S, (y + o) * S, 10 * S, 2 * S);
+      }
+    }
+  }
+  if (el("dash").checked) {
+    ctx.fillStyle = "#c2c2c2"; // 8 x 1 px dash in the middle of every straight tile (measured on tileset.png)
+    for (const [x, y] of L.roads) {
+      const l = isRoad(x - 1, y), r = isRoad(x + 1, y), u = isRoad(x, y - 1), dn = isRoad(x, y + 1);
+      const walk = L.indices[y * L.cols + x] === 1 || L.indices[y * L.cols + x] === 2;
+      const horiz = !walk && l && r && !(u && dn), vert = !walk && u && dn && !(l && r);
+      const cx = (x + 0.5) * TILE * S, cy = (y + 0.5) * TILE * S, len = 8 * S, th = Math.max(1, 1 * S);
+      if (horiz) ctx.fillRect(cx - len / 2, cy - th / 2, len, th);
+      if (vert) ctx.fillRect(cx - th / 2, cy - len / 2, th, len);
+    }
+  }
+}
+
+function render() { el("zoomv").textContent = st.zoom.toFixed(2) + "x"; el("radv").textContent = el("rad").value + " px"; if (tileset.complete) drawOriginal(); drawVector(); }
+tileset.onload = render;
+new ResizeObserver(render).observe(document.querySelector("main"));
+
+// ---- interaction ----
+function setZoom(z, cx, cy) {
+  z = Math.min(6, Math.max(0.5, z));
+  const k = z / st.zoom; st.panX = cx - (cx - st.panX) * k; st.panY = cy - (cy - st.panY) * k; st.zoom = z; el("zoom").value = z; render();
+}
+for (const pane of document.querySelectorAll(".pane")) {
+  pane.addEventListener("wheel", (e) => { e.preventDefault(); const r = pane.getBoundingClientRect(); setZoom(st.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+  pane.addEventListener("pointerdown", (e) => { pane.setPointerCapture(e.pointerId); pane._d = [e.clientX, e.clientY]; pane.classList.add("drag"); });
+  pane.addEventListener("pointermove", (e) => { if (!pane._d) return; st.panX += e.clientX - pane._d[0]; st.panY += e.clientY - pane._d[1]; pane._d = [e.clientX, e.clientY]; render(); });
+  pane.addEventListener("pointerup", () => { pane._d = null; pane.classList.remove("drag"); });
+}
+el("zoom").oninput = () => { const r = cvA.getBoundingClientRect(); setZoom(+el("zoom").value, r.width / 2, r.height / 2); };
+for (const id of ["grain", "curb", "dash", "walk", "rad"]) el(id).oninput = render;
+el("reset").onclick = () => { st.zoom = 1.5; st.panX = 40; st.panY = 30; el("zoom").value = 1.5; render(); };
+render();
+</script>
+</body>
+</html>
