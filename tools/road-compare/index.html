@@ -186,16 +186,19 @@ function drawVector() {
     const th = Math.max(1, 1 * S), len = 8 * S;
     for (const [x, y] of L.roads) {
       const l = isRoad(x - 1, y), r = isRoad(x + 1, y), u = isRoad(x, y - 1), dn = isRoad(x, y + 1);
-      const walk = L.indices[y * L.cols + x] === 1 || L.indices[y * L.cols + x] === 2;
-      const horiz = !walk && l && r && !(u && dn), vert = !walk && u && dn && !(l && r);
+      const t = L.indices[y * L.cols + x], walkH = t === 1, walkV = t === 2, walk = walkH || walkV;
+      const horiz = walkH || (!walk && l && r && !(u && dn)), vert = walkV || (!walk && u && dn && !(l && r));
       const cx = (x + 0.5) * TILE * S, cy = (y + 0.5) * TILE * S, hx = x * TILE * S, hy = y * TILE * S;
+      // crosswalk tiles keep their end dashes (the tileset draws 4 px of a dash at both ends of a crosswalk tile), only the centre dash is replaced by the bars
       if (horiz) {
-        ctx.fillRect(cx - len / 2, cy - th / 2, len, th);
+        if (!walk) ctx.fillRect(cx - len / 2, cy - th / 2, len, th);
         if (isRoad(x - 1, y)) ctx.fillRect(hx - len / 2, cy - th / 2, len, th); // dash across the left boundary
+        if (walk && isRoad(x + 1, y)) ctx.fillRect(hx + TILE * S - len / 2, cy - th / 2, len, th);
       }
       if (vert) {
-        ctx.fillRect(cx - th / 2, cy - len / 2, th, len);
+        if (!walk) ctx.fillRect(cx - th / 2, cy - len / 2, th, len);
         if (isRoad(x, y - 1)) ctx.fillRect(cx - th / 2, hy - len / 2, th, len);
+        if (walk && isRoad(x, y + 1)) ctx.fillRect(cx - th / 2, hy + TILE * S - len / 2, th, len);
       }
     }
   }
