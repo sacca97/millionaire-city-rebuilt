@@ -56,7 +56,31 @@
   "reason": "oracle commerce flows: remaining contract/rent countdown (ms) of the customer houses depends on the wall-clock time at which each client's flow takes its dumps and reloads (the original reloads slower); not a logic difference"
  },
  {
-  "pattern": "(completed|final)\\.saves\\.json: .*houses_001_002@6,-2\\]/Item\\[id0\\]/time: ORIGINAL='89999\\d' OURS='9000\\d\\d'",
+  "pattern": "(completed|final)\\.saves\\.json: .*houses_001_002@6,-2\\]/Item\\[id0\\]/time: ORIGINAL='89999\\d' OURS='(89999\\d|9000\\d\\d)'",
   "reason": "mission-C08-6 only: 1 ms jitter of the remaining construction time (900000 ms) between the two clients' dump times; not a logic difference"
+ },
+ {
+  "pattern": "cmds:\\s+#0 /_dat/security/coinsGain: ORIG=-51\\d OURS=-51\\d$",
+  "reason": "mission-C26-5 only: the instant-build price is charged on the remaining construction time (595,702 vs 591,300 ms left when each client's flow clicked, a wall-clock gap), so coins/company value/time derived from it differ by 4 coins; not a logic difference"
+ },
+ {
+  "pattern": "cmds:\\s+#\\d+ /_dat/security/coinsNow: ORIG=46548\\d OURS=46548\\d$",
+  "reason": "mission-C26-5 only: the instant-build price is charged on the remaining construction time (595,702 vs 591,300 ms left when each client's flow clicked, a wall-clock gap), so coins/company value/time derived from it differ by 4 coins; not a logic difference"
+ },
+ {
+  "pattern": "cmds:\\s+#\\d+ /_dat/security/compValueNow: ORIG=84148\\d OURS=84148\\d$",
+  "reason": "mission-C26-5 only: the instant-build price is charged on the remaining construction time (595,702 vs 591,300 ms left when each client's flow clicked, a wall-clock gap), so coins/company value/time derived from it differ by 4 coins; not a logic difference"
+ },
+ {
+  "pattern": "(completed|final)\\.saves\\.json: universe/universe\\[0\\]/DCCoins: ORIGINAL='46548\\d' OURS='46548\\d'$",
+  "reason": "mission-C26-5 only: the instant-build price is charged on the remaining construction time (595,702 vs 591,300 ms left when each client's flow clicked, a wall-clock gap), so coins/company value/time derived from it differ by 4 coins; not a logic difference"
+ },
+ {
+  "pattern": "(completed|final)\\.saves\\.json: .*Company\\[houses_001_001@6,-2\\]/Item\\[id0\\]/time: ORIGINAL='\\d{6}' OURS='\\d{6}'$",
+  "reason": "mission-C26-5 only: the instant-build price is charged on the remaining construction time (595,702 vs 591,300 ms left when each client's flow clicked, a wall-clock gap), so coins/company value/time derived from it differ by 4 coins; not a logic difference"
+ },
+ {
+  "pattern": "cmds:\\s+#0 /_dat/time: ORIG=\\d{6,7} OURS=\\d{6,7}$",
+  "reason": "mission-C20-55/C26-5: /_dat/time is the remaining item time at the first command, a wall-clock value that differs by the flow timing gap; not a logic difference"
  }
 ]

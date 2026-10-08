@@ -85,6 +85,7 @@ describe("Game core loop against the real server", () => {
 
       // construction finishes (x1e9 clock)
       game.tick(600_001);
+      game.tick(3100); // construction-end notification animation
       expect(game.item(sid)).toMatchObject({ stateId: 1, mode: 1 });
       w = await expectSynced(game, dbWorld, "constructed");
       expect(w.mine!.items.find((i) => i.sid === sid)).toMatchObject({ stateId: 1 });

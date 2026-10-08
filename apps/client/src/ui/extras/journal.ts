@@ -73,6 +73,9 @@ export function mountJournal(ctx: UiContext): void {
     ctx.game.sendCommand(ctx.game.commands.millionNewsFeed());
     void openJournal(ctx, 'magazine');
   };
+  // Profile.logicUpdate runs before MissionObjectManager.logicUpdate in the first frame of the world (DollarsGame.as:1943 vs 2020): the
+  // check at load precedes the reward popups of the missions that become reached at load (oracle R04-65-g1 / R05-61-g1).
+  check(ctx.game.profile.companyValue);
   ctx.game.on('profile', (pr) => check(pr.companyValue));
   setInterval(() => check(ctx.game.profile.companyValue), 2000);
 }

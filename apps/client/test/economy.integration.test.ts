@@ -23,6 +23,8 @@ const defs = loadDefsSync();
 function advance(game: Game, ms: number): void {
   game.timeScale = ms / 1000;
   game.tick(1000);
+  game.timeScale = 0;
+  game.tick(3100); // construction-end notification animation (Game.CONSTRUCTION_END_ANIM_MS)
   game.timeScale = 1;
 }
 

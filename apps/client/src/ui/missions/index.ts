@@ -5,6 +5,7 @@
  * (investment, investmentDone, visitPartner, upgrade, collectUpgraded, askForHelp...) or `game.poll(type, sku?)`.
  */
 import { getText } from "../../gui/i18n";
+import { popups } from "../../gui/popup";
 import { STATE_REACHED, STATE_UNLOCKED, type MissionObject } from "../../game/missions";
 import { uiBus } from "../bus";
 import type { UiContext } from "../context";
@@ -22,6 +23,9 @@ export async function mount(ctx: UiContext): Promise<MissionSystem> {
   const rules = await loadMissionRules();
   const sys = new MissionSystem(ctx.game, rules);
   system = sys;
+  // DollarsGame.mShowPopup: World.logicUpdate (construction end notification) does not run while a popup is open; a mission PopupReward
+  // under construction already counts (oracle C26-5: the instant-build reward popup holds the construction end).
+  ctx.game.logicPaused = () => popups.isAnyOpen || sys.manager.rewardPopupOpen;
   (window as unknown as { __missions?: MissionSystem }).__missions = sys; // dev aid (main.ts overwrites window.__mcity after the UI mounts)
 
   let panel: MissionsPanel | undefined;

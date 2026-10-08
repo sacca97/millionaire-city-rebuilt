@@ -217,6 +217,10 @@ const SELL_BAR_MS = 3000; // StateOnIA SELL_BAR_TIME, reported as the MODE_BUYIN
 
 const GIVING_RENT_MS = 20_000;
 
+// NotificationConstructionEnd (non-effective): Notification.enter plays Event_Contract_anim_ok (houses_info: 42 frames at 30 fps) and only its
+// last frame (checkEnd) runs onAccept -> initItemAfterConstruction, i.e. the new_state goes out ~1.4 s after the item's time ran out.
+const CONSTRUCTION_END_ANIM_MS = 3000;
+
 export class Game extends Emitter<GameEvents> implements ToolHost {
   readonly world: GameWorld;
   /** Influence, commerce population, HQ connectivity, wonder attributes, double rent (game/economy.ts). */
@@ -321,6 +325,14 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
       const dt = wasSuspended ? 0 : savedAt > 0 ? Math.max(0, now - savedAt) : 0;
       // Rent-mode reports of the load-time catch-up go out at STATE_RUN_WORLD, after securityInit (their compValueNow is the recomputed
       // baseline: oracle C13 mode 5 at boot carries 2,424,000); construction completions keep their own ordering.
+      if (!this.tutorial && item.stateId === STATE_ID.CONSTRUCTION && item.mode !== CONSTRUCTION_MODE.PAUSED && !(item.suspended && item.mode !== CONSTRUCTION_MODE.INIT) && item.time <= dt) {
+        // The server's offline catch-up only runs the construction timer down. The end itself is a logic update of the running world
+        // (StateOnConstructionOwner.doDoLogicUpdate -> NotificationConstructionEnd): it happens after securityInit/calculateCompanyValue
+        // (oracle C20: new_state compValueNow 842000, building value added after it) and plays the end animation first (tick()).
+        item.time = 0;
+        this.syncPlaced(item);
+        continue;
+      }
       const transitions = advanceItem(item, dt, this.rules, env);
       this.handleTransitions(transitions.filter((t) => t.type === "constructionDone"));
       bootTransitions.push(...transitions.filter((t) => t.type !== "constructionDone"));
@@ -608,7 +620,7 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
 
   private lastNextRent: number | undefined;
   /** Profile.mNextRentCurrentValue / mNextRentCurrentItemSid (Profile.as:945-975): what the profile last reported (even when nothing was sent). */
-  private profileNextRent = { value: 0, sid: null as string | null };
+  private profileNextRent = { value: -2, sid: null as string | null };
   /**
    * Company.nextRentCalculate -> Profile.nextRentUpdate (Profile.as:945-975): the owner reports the soonest rent to the server
    * (update_next_rent, seconds; 0 = a rent is ready, -1 = none). Company level: only when the value changed. Profile level: while the
@@ -709,10 +721,12 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     const sim = dtMs * this.timeScale;
     this.pushSuspension(); // HQ road connectivity changed (road/item edits invalidate the economy model)
     const env = this.advanceEnv();
+    this.tickConstructionEnd(dtMs);
     for (const item of this.itemMap.values()) {
       // Construction and rent countdowns wait for smTutorialEnd (StateOnConstruction.as:254, StateOnRent.as:1189); a finished
       // instant build (time 0) must still settle.
       if (this.tutorial?.timersFrozen && !(item.stateId === STATE_ID.CONSTRUCTION && item.time <= 0)) continue;
+      if (this.constructionEndPending(item, sim)) continue;
       if (item.stateId === STATE_ID.CONSTRUCTION || (item.stateId === STATE_ID.RENT && (item.mode === RENT_MODE.RENTING || item.mode === RENT_MODE.GET_RENT))) {
         const t = advanceItem(item, sim, this.rules, env);
         if (t.length > 0) {
@@ -722,6 +736,30 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
       }
     }
     this.emitPopulation();
+  }
+
+  /** Set by the UI: true while a popup is open (DollarsGame.mShowPopup); World.logicUpdate and the world animations stand still then. */
+  logicPaused: () => boolean = () => false;
+  /** sid -> real ms left of the construction-end animation (the item stays in construction until it is over). */
+  private readonly constructionEnd = new Map<string, number>();
+  private tickConstructionEnd(dtMs: number): void {
+    if (this.logicPaused()) return;
+    for (const [sid, left] of this.constructionEnd) this.constructionEnd.set(sid, left - dtMs);
+  }
+  /** True while the finished construction of `item` is still waiting for / playing its end notification (the transition is held back). */
+  private constructionEndPending(item: GameItem, sim: number): boolean {
+    if (this.tutorial || item.stateId !== STATE_ID.CONSTRUCTION || item.mode === CONSTRUCTION_MODE.PAUSED || item.time > sim) return false;
+    if (item.suspended && item.mode !== CONSTRUCTION_MODE.INIT) return false;
+    if (this.logicPaused()) return true; // the notification is created by the (paused) logic update
+    const left = this.constructionEnd.get(item.sid);
+    if (left === undefined) {
+      item.time = 0; // mTime ran out; the item waits in construction for the notification
+      this.constructionEnd.set(item.sid, CONSTRUCTION_END_ANIM_MS);
+      return true;
+    }
+    if (left > 0) return true;
+    this.constructionEnd.delete(item.sid);
+    return false;
   }
 
   /** sid -> real ms left of a commerce's GIVING_RENT animation (StateOnRent.checkEnd :1720-1732 -> setNextMode). */

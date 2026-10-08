@@ -19,6 +19,7 @@ import {
   type RewardGain
 } from "../../game/missions";
 import type { DefinitionTable } from "../../model/definitions";
+import { popups } from "../../gui/popup";
 import { uiBus } from "../bus";
 
 const RULES = "/mcity/0.501/Datas/rules/";
@@ -57,6 +58,13 @@ export class MissionSystem {
   readonly manager: MissionManager;
   /** True while a PopupReward is showing (MissionObjectManager.mRewardPopup != null). */
   private visiting = false;
+  /**
+   * The level the mission unlock checks see (UnlockMissionByLevel reads Profile.level). The original raises Profile.level one step at a
+   * time from Profile.checkLevelUpShow, which DollarsGame.logicUpdate only runs while no popup is open (mShowPopup) and which opens a
+   * PopupLevel per step: while the claim's reward popup is open the level-gated missions (oracle R04-65: 11/43/55/67/87) stay locked
+   * until the popups are closed.
+   */
+  private missionLevel: number;
   private updating = false;
   private updatePending = false;
   private payDeferred = false;
@@ -71,11 +79,12 @@ export class MissionSystem {
     opts: MissionSystemOptions
   ) {
     this.tableDefs = game.defs;
+    this.missionLevel = game.profile.level;
     const raw = game.state.profile.raw;
     const flags = parseFlags(raw.flags);
     const defs = activeDefinitions(rewardVariantDefinitions(opts.defs, flags.missionAltReward ?? 0), flags.altMissions === 1);
     const host: MissionHost = {
-      level: () => game.profile.level,
+      level: () => this.missionLevel,
       // `?nogiveback=1` (oracle parity runs only) disables the give-back unlock threshold so mission lists match the original.
       companyValue: () => (typeof location !== "undefined" && /[?&]nogiveback=1/.test(location.search) ? Number.MAX_SAFE_INTEGER : game.profile.companyValue),
       sendMission: (sku, claim) => {
@@ -156,6 +165,7 @@ export class MissionSystem {
     try {
       do {
         this.updatePending = false;
+        if (this.missionLevel < this.game.profile.level && !popups.isAnyOpen && !this.manager.rewardPopupOpen) this.missionLevel += 1;
         this.manager.update();
         this.pushAlert();
       } while (this.updatePending && !this.visiting);

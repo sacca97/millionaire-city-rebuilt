@@ -194,3 +194,11 @@ The give-your-email missions (64 default, 94 alt; original `GUI/PopupEmail` regi
 - **C08-96 open:** after the reload the original re-sends `update_missions` 97..103 (level-gated, absent from its saved chunks); ours does not. Rules identical; why the original's server lacked them is unknown (stale write or `RUN_WORLD` gating). See `tools/missions/worker-notes/INVESTIGATE-C08-96.md`.
 - **C20-55 open:** 5 differences (first `new_state` company value 842000 vs 872000, one `next_rent` command).
 - Parity switch: `?nogiveback=1` on our client disables the give-back unlock lock for oracle runs.
+
+## Round 10 (Lead, autonomous): mission parity status
+
+`python3 tools/missions/mark.py` -> MATCH (oracle) 26, MATCH by class 197, STATIC 5 (C07 wonders, C25 give-back), DEFERRED 90 (social/investment/rival missions the user postponed), TODO 0. The only evidence still DIFFERENT is the alt flow mission-C08-96 (original re-sends level-gated 97..103 after reload; cause unknown, see INVESTIGATE-C08-96.md); its class is matched through mission-C08-6.
+- Real mechanisms found and implemented this round: giving-rent state of commerces; bonus counted at load with sends muted; commerces not tracked for next_rent; `profileNextRent` baseline -2; mission level rises one level per update only while no popup/reward popup is open (Profile.checkLevelUpShow gated by mShowPopup, DollarsGame.as:1929); million-news check before the mission update; construction end waits for the Notification end animation and is frozen while a popup is open; boot catch-up no longer finishes construction; reward claim ordering (claimed mission's update before the earn cascade).
+- Unmeasured: `CONSTRUCTION_END_ANIM_MS = 3000` (game.ts) is fitted to the C26 reload window, not derived from the SWF frame rate. `GIVING_RENT_MS = 20000` is an estimate.
+- Evidence dumps of our runs live in `tools/oracle/out/ours-<flow>` (gitignored); regenerate with `tools/missions/rerun_ours_all.py`, re-verify with `tools/missions/reverify_all.py` (needed after every accepted.json change).
+- Accepted differences are only wall-clock values (countdowns, price derived from remaining time, next_rent seconds) plus deliberate deviations (give-back mission, `next_rent` hint after rival buy).
