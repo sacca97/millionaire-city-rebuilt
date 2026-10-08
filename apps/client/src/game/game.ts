@@ -1040,13 +1040,6 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     return t.kind === "build" && t.sku === sku && t.fromStorage === true;
   }
 
-  /** Offline gold purchase (PopupGold.as:405 -> update_money buyGold; the server awards gold+freeGold from fbcredits.xml). */
-  buyGoldPackage(sku: string, gold: number): void {
-    this.cash += gold;
-    this.companyValue += gold * this.rules.settings.cashToCoins;
-    this.send(this.commands.buyGold(sku));
-    this.emitProfile();
-  }
 
   /** UnlockedListManager.unlockItem: pay `gold` (getUnlockPrice(false)) and mark the item unlocked, then update_money "unlockItem". */
   unlockItem(sku: string, gold: number): boolean {
