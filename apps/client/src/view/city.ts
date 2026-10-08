@@ -1,3 +1,4 @@
+import { renderRoadChunks, vectorRoadsSupported } from "./vectorRoads";
 import { Application, Assets, BlurFilter, Container, Graphics, Rectangle, Sprite, Texture } from "pixi.js";
 import { MAP_COLS, MAP_ROWS, TILE, tileX, tileY } from "../game/geometry";
 import { TILESET_COLS, computeTileIndices, tilesetIndex } from "../terrain";
@@ -10,6 +11,9 @@ import type { Ghost } from "../game/tools";
 import { intersects, worldViewRect } from "./cull";
 
 const CHUNK = 8; // ground tiles per culling chunk side
+/** Roads are drawn as vector art (view/vectorRoads.ts) at this multiple of the native 32 px tiles. `?tileroads=1` restores the original road tile bitmaps (backup path). */
+const ROAD_SCALE = 3;
+const useVectorRoads = (): boolean => vectorRoadsSupported() && !/[?&]tileroads=1/.test(location.search);
 const CULL_MARGIN = 8; // world px
 
 // Geometry lives in game/geometry.ts (no Pixi dependency); re-exported for existing importers.
@@ -30,6 +34,8 @@ export class CityView {
   private views = new Map<string, { view: ItemView; state: ItemStateInput }>();
   /** The whole 90x60 ground baked into one texture (2D canvas): at fractional zoom separate tile sprites left faint seams between tiles. */
   private tilesBaked = new Sprite();
+  /** Vector road chunks drawn above the baked ground (empty with ?tileroads=1). */
+  private roadLayer = new Container();
   private tileCache = new Map<number, Texture>();
   private tileset?: Texture;
   private ghostGfx = new Graphics();
@@ -51,7 +57,7 @@ export class CityView {
     this.items.sortableChildren = true;
     // Map input is handled on the stage (hitArea); nothing under the world is interactive, so skip the per-pointer-move hit-test traversal.
     this.world.interactiveChildren = false;
-    this.ground.addChild(this.tilesBaked);
+    this.ground.addChild(this.tilesBaked, this.roadLayer);
     this.world.addChild(this.ground, this.items, this.itemsTop, this.overlay);
     this.ghostGlow.filters = [new BlurFilter({ strength: 5 })];
     this.overlay.addChild(this.ghostGlow, this.ghostGfx);
@@ -88,14 +94,14 @@ export class CityView {
   private async drawGround(state: WorldState): Promise<void> {
     const g = this.ground;
     for (const c of g.removeChildren()) {
-      if (c !== this.tilesBaked) c.destroy();
+      if (c !== this.tilesBaked && c !== this.roadLayer) c.destroy();
     }
     // Backdrop: terrain.swf "background" clip, origin (0,0) (Background.as:256-259).
     const backdrop = await Assets.load<Texture>("/ground/background.png").catch(() => undefined);
     if (backdrop) {
       g.addChild(new Sprite(backdrop));
     }
-    g.addChild(this.tilesBaked);
+    g.addChild(this.tilesBaked, this.roadLayer);
     const terrain = new Set<number>();
     const road = new Set<number>();
     for (const [x, y] of state.terrain) {
@@ -124,9 +130,24 @@ export class CityView {
     if (!ctx) {
       return;
     }
+    // Roads: vector chunks above the ground (the road tiles are then left out of the bake); falls back to the tile bitmaps.
+    const isRoadTile = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < MAP_COLS && y < MAP_ROWS && sets.roads.has(y * MAP_COLS + x) && !sets.terrain.has(y * MAP_COLS + x);
+    const chunks = useVectorRoads()
+      ? renderRoadChunks({ cols: MAP_COLS, rows: MAP_ROWS, isRoad: isRoadTile, tileIndex: (x, y) => tilesetIndex(data[y * MAP_COLS + x]), scale: ROAD_SCALE, chunk: CHUNK })
+      : undefined;
+    for (const c of this.roadLayer.removeChildren()) c.destroy({ texture: true });
+    if (chunks) {
+      for (const rc of chunks) {
+        const sp = new Sprite(Texture.from(rc.canvas));
+        sp.x = rc.cx * CHUNK * TILE;
+        sp.y = rc.cy * CHUNK * TILE;
+        sp.width = sp.height = CHUNK * TILE;
+        this.roadLayer.addChild(sp);
+      }
+    }
     for (let i = 0; i < data.length; i += 1) {
       const idx = tilesetIndex(data[i]);
-      if (idx < 0) {
+      if (idx < 0 || (chunks && isRoadTile(i % MAP_COLS, Math.floor(i / MAP_COLS)))) {
         continue;
       }
       ctx.drawImage(res, (idx % TILESET_COLS) * TILE, Math.floor(idx / TILESET_COLS) * TILE, TILE, TILE, (i % MAP_COLS) * TILE, Math.floor(i / MAP_COLS) * TILE, TILE, TILE);
