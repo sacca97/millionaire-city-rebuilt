@@ -33,6 +33,7 @@
   <label><input id="dash" type="checkbox" checked> lane dashes</label>
   <label><input id="walk" type="checkbox" checked> crosswalks</label>
   <label>Bend radius <input id="rad" type="range" min="0" max="16" step="1" value="10"><span class="val" id="radv">10 px</span></label>
+  <label>Lane elbow radius <input id="lrad" type="range" min="1" max="14" step="1" value="10"><span class="val" id="lradv">10 px</span></label>
   <button id="reset">Reset view</button>
 </header>
 <main>
@@ -162,7 +163,10 @@ function grainCanvas() {
     id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255;
   }
   c.putImageData(id, 0, 0);
-  return (_grain = n);
+  // smooth 4x upscale (bilinear) so the grain looks like the original bitmap at zoom instead of hard squares
+  const big = document.createElement("canvas"); big.width = big.height = 512;
+  const bc = big.getContext("2d"); bc.imageSmoothingEnabled = true; bc.imageSmoothingQuality = "high"; bc.drawImage(n, 0, 0, 512, 512);
+  return (_grain = big);
 }
 
 function drawVector() {
@@ -175,7 +179,7 @@ function drawVector() {
   if (el("grain").checked) {
     // white noise measured on tileset.png: values 66..76, mean 70.6, std 2.9, neighbour correlation 0.0; one noise pixel = one tile pixel, so it scales with the zoom like the bitmap does
     const pat = ctx.createPattern(grainCanvas(), "repeat");
-    pat.setTransform(new DOMMatrix([S, 0, 0, S, 0, 0]));
+    pat.setTransform(new DOMMatrix([S / 4, 0, 0, S / 4, 0, 0]));
     ctx.fillStyle = pat;
   } else ctx.fillStyle = "rgb(71,71,71)";
   ctx.fill(path);
@@ -202,22 +206,28 @@ function drawVector() {
     // measured on tileset.png: colour 194, dash 7.7 px long, 1 px thick, period 16 px; in a tile the dashes start at x = 12 (centre) and
     // x = 28 (spills 3.7 px into the next tile); the horizontal line occupies y 15..16, the vertical one x 16..17.
     ctx.fillStyle = ctx.strokeStyle = "#c2c2c2";
+    ctx.save(); ctx.clip(path);   // dashes that spill over an open road end are cut off at the road edge, like the tile art
     const T = TILE * S, th = S, len = 7.7 * S;
     const sides = (x, y) => {            // which tile sides [U,R,D,L] carry the lane line
       const t = L.indices[y * L.cols + x];
       if (t === 1) return [0, 1, 0, 1];
       if (t === 2) return [1, 0, 1, 0];
       const n = [isRoad(x, y - 1), isRoad(x + 1, y), isRoad(x, y + 1), isRoad(x - 1, y)], c = n.reduce((a, b) => a + (b ? 1 : 0), 0);
-      if (c === 1 || c === 2) return n.map((v) => (v ? 1 : 0));
+      if (c === 2) return n.map((v) => (v ? 1 : 0));
+      if (c === 1) { const k = n.indexOf(true); const o = [0, 0, 0, 0]; o[k] = 1; o[(k + 2) % 4] = 1; return o; } // dead end: the line runs to the end of the tile
+      if (c === 3) { const m = n.indexOf(false); return m % 2 === 0 ? [0, 1, 0, 1] : [1, 0, 1, 0]; } // T junction: the through street keeps its line
+      if (c === 4) return [1, 1, 1, 1];
       return [0, 0, 0, 0];
     };
     for (const [x, y] of L.roads) {
       const sd = sides(x, y), n = sd.reduce((a, b) => a + b, 0), X = x * T, Y = y * T, t = L.indices[y * L.cols + x];
-      if (n === 2 && t !== 1 && t !== 2) {
-        if (sd[3] && sd[1]) ctx.fillRect(X + 12 * S, Y + 15 * S, len, th);
-        else if (sd[0] && sd[2]) ctx.fillRect(X + 16 * S, Y + 12 * S, th, len);
-        else {                                    // bend: two 4 px arms meeting in a rounded elbow (about 1 px radius), corner at (16.5, 15.5)
-          const dir = [[0, -1], [1, 0], [0, 1], [-1, 0]], [A, B] = [0, 1, 2, 3].filter((k) => sd[k]).map((k) => dir[k]), r = 1 * S, a = 4 * S;
+      if (t !== 1 && t !== 2) {
+        const bend = n === 2 && !(sd[3] && sd[1]) && !(sd[0] && sd[2]);
+        if (!bend) {
+          if (sd[3] && sd[1]) ctx.fillRect(X + 12 * S, Y + 15 * S, len, th);
+          if (sd[0] && sd[2]) ctx.fillRect(X + 16 * S, Y + 12 * S, th, len);
+        } else {                                  // bend: two arms meeting in a rounded elbow (radius from the slider), corner at (16.5, 15.5)
+          const dir = [[0, -1], [1, 0], [0, 1], [-1, 0]], [A, B] = [0, 1, 2, 3].filter((k) => sd[k]).map((k) => dir[k]), r = +el("lrad").value * S, a = Math.max(0, 14 - +el("lrad").value) * S * 0.3;
           const cx = X + 16.5 * S, cy = Y + 15.5 * S;
           ctx.lineWidth = th; ctx.lineCap = "butt"; ctx.beginPath();
           ctx.moveTo(cx + A[0] * (r + a), cy + A[1] * (r + a)); ctx.lineTo(cx + A[0] * r, cy + A[1] * r);
@@ -227,11 +237,17 @@ function drawVector() {
       // boundary dashes: they start 4 px before the tile edge towards the right / lower neighbour
       if (isRoad(x + 1, y) && (sd[1] || sides(x + 1, y)[3])) ctx.fillRect(X + 28 * S, Y + 15 * S, len, th);
       if (isRoad(x, y + 1) && (sd[2] || sides(x, y + 1)[0])) ctx.fillRect(X + 16 * S, Y + 28 * S, th, len);
+      // open ends of a street: the tile art still carries the part of the end dash that lies inside the tile
+      if (sd[1] && !isRoad(x + 1, y)) ctx.fillRect(X + 28 * S, Y + 15 * S, len, th);
+      if (sd[3] && !isRoad(x - 1, y)) ctx.fillRect(X - 4 * S, Y + 15 * S, len, th);
+      if (sd[2] && !isRoad(x, y + 1)) ctx.fillRect(X + 16 * S, Y + 28 * S, th, len);
+      if (sd[0] && !isRoad(x, y - 1)) ctx.fillRect(X + 16 * S, Y - 4 * S, th, len);
     }
+    ctx.restore();
   }
 }
 
-function render() { el("zoomv").textContent = st.zoom.toFixed(2) + "x"; el("radv").textContent = el("rad").value + " px"; if (tileset.complete) drawOriginal(); drawVector(); }
+function render() { el("zoomv").textContent = st.zoom.toFixed(2) + "x"; el("radv").textContent = el("rad").value + " px"; el("lradv").textContent = el("lrad").value + " px"; if (tileset.complete) drawOriginal(); drawVector(); }
 tileset.onload = render;
 new ResizeObserver(render).observe(document.querySelector("main"));
 
@@ -247,7 +263,7 @@ for (const pane of document.querySelectorAll(".pane")) {
   pane.addEventListener("pointerup", () => { pane._d = null; pane.classList.remove("drag"); });
 }
 el("zoom").oninput = () => { const r = cvA.getBoundingClientRect(); setZoom(+el("zoom").value, r.width / 2, r.height / 2); };
-for (const id of ["grain", "curb", "dash", "walk", "rad"]) el(id).oninput = render;
+for (const id of ["grain", "curb", "dash", "walk", "rad", "lrad"]) el(id).oninput = render;
 el("reset").onclick = () => { st.zoom = 1.5; st.panX = 40; st.panY = 30; el("zoom").value = 1.5; render(); };
 render();
 </script>
