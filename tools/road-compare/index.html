@@ -182,24 +182,32 @@ function drawVector() {
     }
   }
   if (el("dash").checked) {
-    ctx.fillStyle = "#c2c2c2"; // 8 x 1 px dashes every 16 px: one in the tile centre and one across the tile boundary (measured on tileset.png)
-    const th = Math.max(1, 1 * S), len = 8 * S;
+    ctx.fillStyle = ctx.strokeStyle = "#c2c2c2"; // 8 x 1 px dashes every 16 px; bends get a small rounded elbow (measured on tileset.png)
+    const th = Math.max(1, 1 * S), len = 8 * S, T = TILE * S;
+    const sides = (x, y) => {            // which tile sides [U,R,D,L] carry the lane line
+      const t = L.indices[y * L.cols + x];
+      if (t === 1) return [0, 1, 0, 1];
+      if (t === 2) return [1, 0, 1, 0];
+      const n = [isRoad(x, y - 1), isRoad(x + 1, y), isRoad(x, y + 1), isRoad(x - 1, y)], c = n.reduce((a, b) => a + (b ? 1 : 0), 0);
+      if (c === 1) return n.map((v) => (v ? 1 : 0));
+      if (c !== 2) return [0, 0, 0, 0];
+      return n.map((v) => (v ? 1 : 0));   // straight (opposite sides) or bend (two perpendicular sides)
+    };
     for (const [x, y] of L.roads) {
-      const l = isRoad(x - 1, y), r = isRoad(x + 1, y), u = isRoad(x, y - 1), dn = isRoad(x, y + 1);
-      const t = L.indices[y * L.cols + x], walkH = t === 1, walkV = t === 2, walk = walkH || walkV;
-      const horiz = walkH || (!walk && l && r && !(u && dn)), vert = walkV || (!walk && u && dn && !(l && r));
-      const cx = (x + 0.5) * TILE * S, cy = (y + 0.5) * TILE * S, hx = x * TILE * S, hy = y * TILE * S;
-      // crosswalk tiles keep their end dashes (the tileset draws 4 px of a dash at both ends of a crosswalk tile), only the centre dash is replaced by the bars
-      if (horiz) {
-        if (!walk) ctx.fillRect(cx - len / 2, cy - th / 2, len, th);
-        if (isRoad(x - 1, y)) ctx.fillRect(hx - len / 2, cy - th / 2, len, th); // dash across the left boundary
-        if (walk && isRoad(x + 1, y)) ctx.fillRect(hx + TILE * S - len / 2, cy - th / 2, len, th);
+      const sd = sides(x, y), n = sd.reduce((a, b) => a + b, 0), cx = (x + 0.5) * T, cy = (y + 0.5) * T, t = L.indices[y * L.cols + x];
+      if (n === 2 && t !== 1 && t !== 2) {
+        if (sd[3] && sd[1]) ctx.fillRect(cx - len / 2, cy - th / 2, len, th);
+        else if (sd[0] && sd[2]) ctx.fillRect(cx - th / 2, cy - len / 2, th, len);
+        else {                                    // bend: two 4 px arms meeting in a rounded elbow of about 1.5 px radius
+          const dir = [[0, -1], [1, 0], [0, 1], [-1, 0]], [A, B] = [0, 1, 2, 3].filter((k) => sd[k]).map((k) => dir[k]), r = 1.5 * S, a = 4 * S;
+          ctx.lineWidth = th; ctx.lineCap = "butt"; ctx.beginPath();
+          ctx.moveTo(cx + A[0] * (r + a), cy + A[1] * (r + a)); ctx.lineTo(cx + A[0] * r, cy + A[1] * r);
+          ctx.arcTo(cx, cy, cx + B[0] * r, cy + B[1] * r, r); ctx.lineTo(cx + B[0] * (r + a), cy + B[1] * (r + a)); ctx.stroke();
+        }
       }
-      if (vert) {
-        if (!walk) ctx.fillRect(cx - th / 2, cy - len / 2, th, len);
-        if (isRoad(x, y - 1)) ctx.fillRect(cx - th / 2, hy - len / 2, th, len);
-        if (walk && isRoad(x, y + 1)) ctx.fillRect(cx - th / 2, hy + TILE * S - len / 2, th, len);
-      }
+      // boundary dashes (centred on the tile edge) towards the right and lower neighbour when either tile carries the line there
+      if (isRoad(x + 1, y) && (sd[1] || sides(x + 1, y)[3])) ctx.fillRect((x + 1) * T - th / 2 * 0 - len / 2, cy - th / 2, len, th);
+      if (isRoad(x, y + 1) && (sd[2] || sides(x, y + 1)[0])) ctx.fillRect(cx - th / 2, (y + 1) * T - len / 2, th, len);
     }
   }
 }
