@@ -13,6 +13,7 @@ for (let y = 3; y <= 7; y += 1) put(12, y);            // T branch
 for (let y = 0; y <= 3; y += 1) put(8, y);             // stub going up
 for (let x = 22; x <= 24; x += 1) put(x, 7);           // short spur
 for (let y = 3; y <= 7; y += 1) put(24, y);            // bend
+for (let y = 0; y <= 8; y += 1) put(16, y);            // four-way crossing with the main street
 const data = computeTileIndices({ cols, rows, terrain: new Set<number>(), road });
 const indices = Array.from(data, (v) => tilesetIndex(v));
 const roads = [...road].map((i) => [i % cols, Math.floor(i / cols)]);

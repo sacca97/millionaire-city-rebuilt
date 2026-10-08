@@ -259,10 +259,10 @@ export function renderRoadChunks(input: RoadInput): RoadChunk[] {
       const t = tileIndex(x, y);
       if (t !== 1 && t !== 2) {
         const bend = n === 2 && !(sd[3] && sd[1]) && !(sd[0] && sd[2]);
-        if (!bend) {
+        if (!bend && n !== 4) { // a four-way crossing keeps only the dashes at its edges (tileset tile 78 has no centre dash)
           if (sd[3] && sd[1]) ctx.fillRect(X + 12 * S, Y + 15 * S, len, th);
           if (sd[0] && sd[2]) ctx.fillRect(X + 16 * S, Y + 12 * S, th, len);
-        } else {
+        } else if (bend) {
           // bend: arms + arc add up to the length of every other dash, corner at (16.5, 15.5)
           const dir = [[0, -1], [1, 0], [0, 1], [-1, 0]];
           const [A, B] = [0, 1, 2, 3].filter((k) => sd[k]).map((k) => dir[k]);
