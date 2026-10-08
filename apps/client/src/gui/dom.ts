@@ -12,9 +12,9 @@ const SHEET = `
 .g-n{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none}
 .g-n.g-hit{pointer-events:auto}
 .g-tex{position:absolute;display:block;max-width:none;user-select:none;-webkit-user-drag:none}
-.g-text{position:absolute;box-sizing:border-box;padding:0 2px;display:flex;align-items:center;overflow:visible;white-space:nowrap}
+.g-text{position:absolute;box-sizing:border-box;padding:2px;display:flex;align-items:flex-start;overflow:visible;white-space:nowrap}
 .g-text.g-top{align-items:flex-start}
-.g-t{display:block;width:100%;line-height:1.1}
+.g-t{display:block;width:100%}
 .g-text.g-wrap .g-t{white-space:pre-wrap;word-break:normal;overflow-wrap:normal}
 .g-state{position:absolute;left:0;top:0}
 `;
@@ -33,12 +33,24 @@ function matrixCss(m: Matrix): string {
 }
 
 /** Style a text field element from its symbol (DCTextField semantics: Flash 2px gutter, anchored at field bounds). */
+/** Flash line box = font ascent + descent (em) + the paragraph's `leading` (px, added below each line). */
+export function lineBoxEm(face: string | undefined): number {
+  const f = (face ?? '').replace(/\0/g, '').trim().toLowerCase();
+  if (f.startsWith('challenge')) return 1.148; // hhea 923+253 / 1024
+  if (f.startsWith('helvetica')) return 1.2; // 986+220 / 1024
+  return 1.117; // Arial 905+212 / 1024
+}
+
 export function styleText(box: HTMLElement, span: HTMLElement, t: TextSymbol, size = t.size): void {
   const [x0, y0, x1, y1] = t.bounds;
   const spec = fontSpecFor(t.font, t.bold, t.italic);
   box.style.cssText += `left:${x0}px;top:${y0}px;width:${x1 - x0}px;height:${y1 - y0}px;`;
   const ls = t.letterSpacing ? `letter-spacing:${t.letterSpacing}px;` : '';
-  span.style.cssText = `${fontCss(spec, size)}color:${t.color};text-align:${t.align === 'justify' ? 'left' : t.align};${ls}`;
+  // Flash anchors text at the top of the field (2px gutter) and spaces lines by ascent+descent+leading: the first baseline stays at
+  // the ascent, so the half-leading CSS adds above line 1 is cancelled by a negative margin.
+  const lead = t.leading ?? 0;
+  const lh = `line-height:calc(${lineBoxEm(t.font)}em + ${lead}px);margin-top:${-lead / 2}px;`;
+  span.style.cssText = `${fontCss(spec, size)}color:${t.color};text-align:${t.align === 'justify' ? 'left' : t.align};${ls}${lh}`;
   span.dataset.size = String(t.size);
   box.classList.toggle('g-wrap', t.multiline || t.wordWrap);
   if (t.multiline || t.wordWrap) box.classList.add('g-wrap');
