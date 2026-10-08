@@ -1,0 +1,53 @@
+{
+  "sounds": {
+    "Main_Music": {
+      "file": "main.mp3",
+      "kind": "music",
+      "loop": true,
+      "volume": 1.0
+    },
+    "Ronald_Music": {
+      "file": "tycoon.mp3",
+      "kind": "music",
+      "loop": true,
+      "volume": 1.0
+    },
+    "Tutorail_Music": {
+      "file": "tutorial2.mp3",
+      "kind": "music",
+      "loop": true,
+      "volume": 1.0
+    },
+    "Income_Sound": {
+      "file": "money.mp3",
+      "kind": "sfx",
+      "loop": false,
+      "volume": 1.0
+    },
+    "Contract_Sound": {
+      "file": "contract.mp3",
+      "kind": "sfx",
+      "loop": false,
+      "volume": 1.0
+    },
+    "Build_Sound": {
+      "file": "build.mp3",
+      "kind": "sfx",
+      "loop": false,
+      "volume": 1.0
+    },
+    "Destroy_Sound": {
+      "file": "bulldoze.mp3",
+      "kind": "sfx",
+      "loop": false,
+      "volume": 1.0
+    },
+    "Level_Sound": {
+      "file": "levelup.mp3",
+      "kind": "sfx",
+      "loop": false,
+      "volume": 1.0
+    }
+  },
+  "embedded": {}
+}

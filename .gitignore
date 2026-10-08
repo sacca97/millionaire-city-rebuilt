@@ -70,7 +70,6 @@ apps/client/public/audio/
 apps/client/public/ground/
 apps/client/public/fonts/
 tools/oracle/out/
-apps/client/public-opt/
 apps/client/public-bak/
 
 # archives, bundles and generated tool output (not part of the repo)

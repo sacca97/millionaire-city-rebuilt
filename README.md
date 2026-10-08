@@ -73,3 +73,9 @@ The bundled Electron runtime is the recommended way to play.
 - `assets`: recovered game cache served by the local server
 - `apps/desktop/assets/flash`: bundled Pepper Flash runtime binaries
 - `generated`: generated private SWF copy, SQLite save data, downloaded tools, release runtime files, and local backups
+
+## Game art
+
+`apps/client/public-opt/` (optimised WebP/audio/fonts, about 275 MB) is committed so a fresh checkout renders completely: `make install && make build && make run`
+(`make build` uses it automatically). The full-size originals (`apps/client/public/`) are generated from the original SWF files by `tools/export_*.py`
+and stay out of git. Art is derived from the original game's assets; see NOTICE.md.

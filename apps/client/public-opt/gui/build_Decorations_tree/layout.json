@@ -1,0 +1,1 @@
+{"swf":"build_Decorations_tree.swf","frameRate":12.0,"stage":[0,0,760,594],"fonts":[],"classes":{"image":3},"symbols":{"2":{"t":"shape","bounds":[-51,-51,51,51],"png":"shapes/2.png"},"3":{"t":"sprite","frames":[[{"d":2,"ref":2}]],"bounds":[-51,-51,51,51],"png":"sprites/image/","pngFrames":1}},"root":{"t":"sprite","frames":[[]]}}
