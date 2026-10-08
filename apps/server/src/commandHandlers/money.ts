@@ -123,7 +123,9 @@ function applyMoneySecurityField(
   // The original client sends a stale (pre-spend) coinsNow on map/contract commands, so trusting Now would lose the spend.
   if (targetKey !== "companyValue" && Number.isFinite(gainValue) && Number.isFinite(Number(profile[targetKey] ?? "0"))) {
     if (gainValue !== 0) {
-      profile[targetKey] = String(Number(profile[targetKey] ?? "0") + gainValue);
+      const next = Number(profile[targetKey] ?? "0") + gainValue;
+      // Coins and gold are never negative: a spend the saved balance cannot cover (stale client, repeated command) stops at 0.
+      profile[targetKey] = String(targetKey === "DCCoins" || targetKey === "DCCash" ? Math.max(0, next) : next);
     }
     return;
   }

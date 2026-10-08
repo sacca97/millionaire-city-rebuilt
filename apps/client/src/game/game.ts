@@ -1213,10 +1213,17 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
       this.hooks.confirmMove(sid, tx, ty);
       return true;
     }
+    const cost = this.moveRented ? 0 : this.movePrice(item);
+    // The balance never goes below zero: every paid action checks the price first (the free-move confirm popup used to skip this).
+    if (cost > this.coins) {
+      this.noCoins(cost);
+      this.toast("Not enough coins", "error");
+      this.hooks.notEnoughCoins?.(cost);
+      return false;
+    }
     // Map.placeItem destroys owned terrain under a non-terrain item (decorations) BEFORE the move cost is paid and sent
     // (oracle C30: update_map del Terrain +1000, then update_item move -400; doing it after consumed the -400 into the baseline).
     this.destroyTerrainUnder(item.def.rules, tx, ty);
-    const cost = this.moveRented ? 0 : this.movePrice(item);
     this.addCoins(-cost);
     this.world.removeItem(sid); // footprint is derived from the (still old) placed.x/y
     item.x = relX(tx);
