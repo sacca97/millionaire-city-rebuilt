@@ -237,11 +237,6 @@ function drawVector() {
       // boundary dashes: they start 4 px before the tile edge towards the right / lower neighbour
       if (isRoad(x + 1, y) && (sd[1] || sides(x + 1, y)[3])) ctx.fillRect(X + 28 * S, Y + 15 * S, len, th);
       if (isRoad(x, y + 1) && (sd[2] || sides(x, y + 1)[0])) ctx.fillRect(X + 16 * S, Y + 28 * S, th, len);
-      // open ends of a street: the tile art still carries the part of the end dash that lies inside the tile
-      if (sd[1] && !isRoad(x + 1, y)) ctx.fillRect(X + 28 * S, Y + 15 * S, len, th);
-      if (sd[3] && !isRoad(x - 1, y)) ctx.fillRect(X - 4 * S, Y + 15 * S, len, th);
-      if (sd[2] && !isRoad(x, y + 1)) ctx.fillRect(X + 16 * S, Y + 28 * S, th, len);
-      if (sd[0] && !isRoad(x, y - 1)) ctx.fillRect(X + 16 * S, Y - 4 * S, th, len);
     }
     ctx.restore();
   }
