@@ -117,7 +117,9 @@ export async function openContractPopup(ctx: UiContext, sid: string): Promise<vo
   if (!item || item.stateId !== STATE_ID.RENT || item.mode !== RENT_MODE.WAITING_FOR_CONTRACT || open.has(sid)) return;
   if (opening.has(sid)) return; // HUD actions and the popups area both react to the same selection
   opening.add(sid);
-  const options = game.contractOptions(sid).sort((a, b) => a.level - b.level || a.timeMs - b.timeMs);
+  // ContractBoxSingle.createItems: the order of contractsTypes.xml, NOT sorted (locked high-level contracts such as Pilots / Artists / Football Star
+  // sit between the unlocked ones; sorting by level used to move them to the end for 35 of the 36 contract types).
+  const options = game.contractOptions(sid);
   if (!options.length) {
     opening.delete(sid);
     return;
