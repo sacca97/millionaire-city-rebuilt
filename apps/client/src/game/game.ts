@@ -82,7 +82,7 @@ export interface ContractOption {
   unlocked: boolean;
   affordable: boolean;
   cost: number;
-  /** Coins paid per collection (def income + contract income, before influence/upgrades). */
+  /** Contract income shown in the info box (raw contract incomeCoins, not the amount paid). */
   income: number;
   xp: number;
   timeMs: number;
@@ -1285,11 +1285,11 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
       unlocked: this.level >= c.level,
       affordable: this.coins >= c.costCoins,
       cost: c.costCoins,
-      // Houses include the influence of the surrounding decorations/wonders (ItemObject.getIncomeValue :369); clubs the population.
-      income: item.isClub
-        ? this.economy.commerceInfoIncome(item, c)
-        : getIncomeValue({ def: item.def.rules, contract: c, influenceValue: this.economy.influencePercent(item.sid) }),
-      xp: getIncomeXP(item.def.rules, c),
+      // Info box value: the raw contract income/XP (InfoBoxContract.as:63-64 -> ContractItem.getIncomeCoins/getIncomeXP, which
+      // ContractItem.setContractDefinition :137-138 only accumulates from the contract). No influence/population/def income here;
+      // the amount actually paid is computed in collectRent from the item, not from this option.
+      income: c.incomeCoins,
+      xp: c.incomeXP,
       timeMs: c.incomeTimeMs
     };
   }

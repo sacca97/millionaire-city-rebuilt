@@ -97,7 +97,8 @@ describe("Game core loop against the real server", () => {
       expect(opts.length).toBeGreaterThan(3);
       // 350 base rent + the influence of the decorations around the house (ItemObject.getIncomeValue :369)
       const rent = Math.trunc(350 + (350 * game.economy.influencePercent(sid)) / 100);
-      expect(opts[0]).toMatchObject({ sku: 1, cost: 90, income: rent });
+      // the info box shows the raw contract income (InfoBoxContract.as:63), the payout below still includes influence
+      expect(opts[0]).toMatchObject({ sku: 1, cost: 90, income: 350 });
       expect(game.signContract(sid, 1)).toBe(true);
       expect(game.item(sid)).toMatchObject({ mode: 4, contractSku: 1 });
       w = await expectSynced(game, dbWorld, "signed");

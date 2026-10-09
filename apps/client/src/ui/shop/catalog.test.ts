@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { parseElements } from '@mcity/rules';
 import { describe, expect, it } from 'vitest';
 import {
-  buildCard, cardsForTab, compareItems, limEdUnits, locateItem, pageCount, parseCatalogSettings, parseLimEdList, parseShopItem,
+  buildCard, cardsForTab, compareItems, itemsForTab, levelUpItems, limEdUnits, locateItem, pageCount, parseCatalogSettings, parseLimEdList, parseShopItem,
   parseStorageList, parseUnlockedList, slotOf, tabCounts, tabIndexOf, unlockPrice, unlockSegmentsPrice,
   TAB_FEATURED, TAB_NEW_ITEMS, TYPE_COMMERCES, TYPE_DECORATIONS, TYPE_HOUSES, TYPE_WONDERS, type CatalogDef, type CatalogState,
 } from './catalog';
@@ -146,5 +146,48 @@ describe('shop catalog', () => {
     const b = parseShopItem({ sku: 'b', attrs: { level: '2', constructionCoins: '200', exp: '1' } });
     const c = parseShopItem({ sku: 'c', attrs: { level: '1', constructionCoins: '900', exp: '1' } });
     expect([b, a, c].sort(compareItems).map((x) => x.sku)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('level-up list (PopupLevel.getItemsByLevel + isAllowedToBeInLevelUp): only current level-unlocked shop items, type order', () => {
+    const st = state({ level: 7, npcWonderSku: 'wonder_npc_Ronald' });
+    const skus = levelUpItems(defs, 7, st, settings).map((i) => i.sku);
+    // expired seasonal items and freeGift sets are not listed (F1: decorations_christmas_03, houses_023_001 are expired L7 items)
+    expect(skus).not.toContain('decorations_christmas_03');
+    expect(skus).not.toContain('houses_023_001');
+    // cross_* decorations (unlockCondition) and where-without-shop items are never listed
+    for (const sku of ['decorations_special_84', 'houses_037_001', 'decorations_christmas_07']) {
+      expect(levelUpItems(defs, defs.find((d) => d.sku === sku)!.attrs.level ? Number(defs.find((d) => d.sku === sku)!.attrs.level) : 1, st, settings).map((i) => i.sku)).not.toContain(sku);
+    }
+    const types = levelUpItems(defs, 7, st, settings).map((i) => i.type);
+    expect([...types].sort((a, b) => a - b)).toEqual(types);
+    for (const i of levelUpItems(defs, 7, st, settings)) {
+      expect(i.level).toBe(7);
+      expect(i.freeGift).toBe(false);
+      expect(i.unlockCondition).toBe('level');
+    }
+  });
+
+  it('level-up list keeps only the player boss wonder_npc_* and never clubs (L25, L3)', () => {
+    const ronald = levelUpItems(defs, 25, state({ level: 25, npcWonderSku: 'wonder_npc_Ronald' }), settings).map((i) => i.sku);
+    expect(ronald).toContain('wonder_npc_Ronald');
+    expect(ronald).not.toContain('wonder_npc_Cindy');
+    expect(levelUpItems(defs, 3, state({ level: 3 }), settings).map((i) => i.sku)).not.toContain('club_001');
+  });
+
+  it('shop order compares the gold price first (ItemDefinitionManager.as:119-146): houses L35', () => {
+    const by = (sku: string) => parseShopItem(defs.find((d) => d.sku === sku)!);
+    const a = by('houses_047_002'); // FBC 34, exp 35000
+    const b = by('houses_041_002'); // FBC 44, exp 50000
+    const c = by('houses_029_001'); // FBC 70, exp 28000
+    expect([c, b, a].sort(compareItems).map((i) => i.sku)).toEqual(['houses_047_002', 'houses_041_002', 'houses_029_001']);
+  });
+
+  it('featured tab also lists items with an offer or free items; unchanged without offers', () => {
+    const base = itemsForTab(defs, TAB_FEATURED, state(), settings).map((i) => i.sku);
+    expect(base).not.toContain('houses_001_001');
+    const offers = new Map([['houses_001_001', { offerType: 'discount' as const, amount: 0.5 }]]);
+    const withOffer = itemsForTab(defs, TAB_FEATURED, state({ offers, freeItems: new Set(['houses_002_001']) }), settings).map((i) => i.sku);
+    expect(withOffer[0]).toBe('houses_001_001');
+    expect(withOffer).toContain('houses_002_001');
   });
 });

@@ -6,6 +6,8 @@ import { getText, t } from '../../gui/i18n';
 import { Popup } from '../../gui/popup';
 import { localBounds, Widget } from '../../gui/widget';
 import type { UiContext } from '../context';
+import { levelUpItems, type CatalogSettings, type CatalogState } from '../shop/catalog';
+import { getShop } from '../shop';
 import { setItemIcon } from '../shop/icons';
 import { startNoteRain, stopNoteRain } from '../extras/noterain';
 
@@ -18,13 +20,16 @@ export function unlockedAtLevel(ctx: UiContext, level: number): string[] {
 }
 
 export function unlockedSkusAtLevel(ctx: UiContext, level: number): string[] {
-  const out: string[] = [];
-  for (const d of ctx.defs.values()) {
-    if (d.sku === 'HeadQuarter' || d.rules.level !== level || d.attrs.unlockCondition === 'fan') continue;
-    if (d.attrs.hidden === '1' || d.attrs.inShop === '0') continue;
-    out.push(d.sku);
-  }
-  return out;
+  const shop = getShop()?.data;
+  const g = ctx.game;
+  // Without a mounted shop fall back to a plain state (no limEd server data, nothing built).
+  const st: CatalogState = shop?.state() ?? {
+    level: g.profile.level, coins: g.profile.coins, cash: g.profile.cash, now: ctx.conn.now(), unlocked: new Set(), limEd: new Map(),
+    built: () => 0, isFan: false,
+  };
+  const settings: CatalogSettings = shop?.settings ?? { unlockMaxPrice: 65, limEdSoldOutShowTimeHours: 48, cashToCoins: 60000, segments: [] };
+  const defs = shop?.defs ?? [...ctx.defs.values()].map((d) => ({ sku: d.sku, attrs: d.attrs }));
+  return levelUpItems(defs, level, st, settings).map((i) => i.sku);
 }
 
 export async function openLevelUp(ctx: UiContext, level: number): Promise<void> {

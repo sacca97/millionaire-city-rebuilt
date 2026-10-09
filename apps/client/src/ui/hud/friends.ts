@@ -4,7 +4,7 @@
  * "Add neighbors" slot. Offline: neighbors = get_neighbor_list entries + the NPCs of NPCDefinitions.xml
  * (FriendsManager.npcsLoad: advisors only for the player's boss genre). Clicking a box emits uiBus 'visit'.
  */
-import { convertNumberToString, TRUNCATE_MILLIONS } from "../../gui/format";
+import { convertNumberRanking } from "../../gui/format";
 import { getText } from "../../gui/i18n";
 import { Button } from "../../gui/button";
 import { Widget, type Part } from "../../gui/widget";
@@ -208,7 +208,8 @@ export class FriendsBar {
     for (const i of [1, 2, 3]) w.find(`position_${i}`)?.setVisible(position === i);
     w.part("position").setText(String(position), { rich: false });
     w.part("Name").setText(n.name, { rich: false });
-    w.part("Dollars").setText(getText("TID_COIN_SYMBOL") + convertNumberToString(n.companyValue, TRUNCATE_MILLIONS, 6), { rich: false });
+    // FriendsBarContentFriend.as:116/141: TextManager.convertNumberRanking
+    w.part("Dollars").setText(getText("TID_COIN_SYMBOL") + convertNumberRanking(n.companyValue), { rich: false });
     w.part("ExLevel").setText(String(levelOf(this.ctx.game.rules, n.exp)), { rich: false });
     if (n.photo) w.part("photo").setImage(n.photo, { x: 0, y: 0, w: 50, h: 50 });
     const hit = hitArea(w.self);

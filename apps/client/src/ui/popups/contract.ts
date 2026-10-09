@@ -72,7 +72,8 @@ async function makeItem(ctx: UiContext, sid: string, o: ContractOption, index: n
   hit.addEventListener('pointerenter', async () => {
     setScale(1.05); // ContractItem.onMouseOver: GTween scale 1 -> 1.05 in 0.05 s
     const right = index % 3 !== 2;
-    const iw = await Widget.create('contracts', right ? 'popup_info_box_right' : 'popup_info_box_left');
+    // InfoBoxContract.as:21-34: clubs use popup_info_box_club_left/right
+    const iw = await Widget.create('contracts', `popup_info_box_${ctx.game.item(sid)?.isClub ? 'club_' : ''}${right ? 'right' : 'left'}`);
     if (!hit.matches(':hover')) return;
     iw.setText('Caption', contractName(o), { fit: true });
     iw.setText('Income', getText('TID_SHOP_RENT'));

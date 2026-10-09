@@ -302,6 +302,9 @@ export function unlockPrice(item: ShopItem, st: CatalogState, s: CatalogSettings
 /** DefinitionManager.sortCompareFunction + ItemDefinitionManager.sortCompareSameLevelFunction/CostFunction. */
 export function compareItems(a: ShopItem, b: ShopItem): number {
   if (a.level !== b.level) return a.level > b.level ? 1 : -1;
+  // ItemDefinitionManager.as:119-146 (sortCompareSameLevelFunction): the gold price (constructionFBC) is compared first
+  if (a.fbc > b.fbc && b.fbc > 0) return 1;
+  if (a.fbc < b.fbc && a.fbc > 0) return -1;
   if (a.coins > b.coins && b.coins > 0) return 1;
   if (a.coins < b.coins && a.coins > 0) return -1;
   // sortCompareSameCostFunction returns -1 for equal XP; Flash's Array.sort then keeps the definition order (oracle shop-houses: Bungalow
@@ -316,7 +319,8 @@ export function itemsForTab(defs: Iterable<CatalogDef>, tab: number, st: Catalog
     const it = parseShopItem(d);
     let inTab: boolean;
     if (tab === TAB_NEW_ITEMS) inTab = it.shopTabs.includes('new_items');
-    else if (tab === TAB_FEATURED) inTab = it.featured;
+    // ItemDefinition.as:302-314 offerDef setter, OfferManager.addFreeItem (:45-54): items with an offer or free items are featured too
+    else if (tab === TAB_FEATURED) inTab = it.featured || (st.offers?.has(it.sku) ?? false) || (st.freeItems?.has(it.sku) ?? false);
     else if (tab === TYPE_BUNDLE) inTab = false; // BundleDefinition: no bundle rules ship with 0.501
     else inTab = it.type === tab || (it.shopTabs.includes(SHOP_TABS[tab] as string) && tab < TYPE_BUNDLE);
     if (!inTab) continue;
@@ -329,6 +333,24 @@ export function itemsForTab(defs: Iterable<CatalogDef>, tab: number, st: Catalog
     return out.sort((a, b) => has(a) - has(b) || compareItems(a, b));
   }
   return out.sort(compareItems);
+}
+
+/**
+ * PopupLevel.as:229 getItemsByLevel(level, -1, isAllowedToBeInLevelUp) (ItemDefinition.as:1280-1325, ItemDefinitionManager.checkLevel :204):
+ * unlockCondition == level, level == n, shop-allowed (where/freeGift/other boss's wonder_npc/release/expire/limEd/A-B) minus bundles and clubs.
+ * Order: type 0..4 (DefinitionManager.getDefinitionsWithCondition :162-190), each type in shop order (compareItems).
+ */
+export function levelUpItems(defs: Iterable<CatalogDef>, level: number, st: CatalogState, s: CatalogSettings): ShopItem[] {
+  const out: ShopItem[] = [];
+  for (const d of defs) {
+    const it = parseShopItem(d);
+    if (it.unlockCondition !== 'level' || it.level !== level) continue;
+    if (it.type === TYPE_BUNDLE || it.type === TYPE_CLUBS) continue;
+    // the club "already built" test of isAllowedToBeInShop does not exist here, and clubs are excluded anyway
+    if (!isAllowedInShop(it, st, s)) continue;
+    out.push(it);
+  }
+  return out.sort((a, b) => a.type - b.type || compareItems(a, b));
 }
 
 function boxFor(item: ShopItem, kind: CardKind): BoxClass {

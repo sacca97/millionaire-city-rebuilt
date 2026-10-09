@@ -66,6 +66,10 @@ describe('ranking', () => {
     expect(convertNumberRanking(1234)).toBe('1,234');
     expect(convertNumberRanking(12345)).toBe('12K');
     expect(convertNumberRanking(1500000)).toBe('1.50M');
+    // friends bar company value (FriendsBarContentFriend.as:116/141)
+    expect(convertNumberRanking(250000)).toBe('250K');
+    expect(convertNumberRanking(12345678)).toBe('12.3M');
+    expect(convertNumberRanking(100000000)).toBe('100M');
   });
 });
 
