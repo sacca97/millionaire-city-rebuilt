@@ -82,5 +82,13 @@
  {
   "pattern": "cmds:\\s+#0 /_dat/time: ORIG=\\d{6,7} OURS=\\d{6,7}$",
   "reason": "mission-C20-55/C26-5: /_dat/time is the remaining item time at the first command, a wall-clock value that differs by the flow timing gap; not a logic difference"
+ },
+ {
+  "pattern": "investmentsList\\[id9000\\d\\d\\]/startedAt: ",
+  "reason": "investment flows (C27/C28) seed startedAt from Date.now() - 21 days so the rows are claimable; wall-clock value, ids are fixed (900001+)"
+ },
+ {
+  "pattern": "completed\\.saves\\.json: universe/universe\\[sid1\\]/World\\[sid1\\]/Company\\[houses_001_002@6,-2\\]/Item\\[id0\\]/time: ",
+  "reason": "C01-3 (mission-C01-3): construction countdown of the house the flow builds, read at dump time; the ~0.9 s gap is wall-clock between the two runs' save dumps"
  }
 ]

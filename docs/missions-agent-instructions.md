@@ -72,7 +72,7 @@ YOUR TASKS (in order)
  E. Reload robustness: ensure at least one evidence run where a mission is REACHED but unclaimed at reload (flow: seed Reached list; see mission-reload.mjs) and one run where a reload happens between 'reached' and 'given' (kill the page after the reached popup).
  F. Run: python3 tools/missions/static_sweep.py; cd apps/client && npx vitest run test/missions-sweep.test.ts; npm run test:rewrite; cd apps/client && npx tsc --noEmit; python3 tools/missions/mark.py. Update docs/parity-plan.md section 5 item 3 with the real counts from docs/missions-status.md.
 
-YOU MAY EDIT: apps/client/src/**, apps/server/src/** (only for proven deviations from the Java/original), tools/missions/accepted.json, tools/missions/manual.json (each entry needs a citation file:line), docs/missions-parity.md, docs/parity-plan.md.
+YOU MAY EDIT: apps/client/src/**, apps/server-rs/src/** (only for proven deviations from the Java/original; the TS server is gone), tools/missions/accepted.json, tools/missions/manual.json (each entry needs a citation file:line), docs/missions-parity.md, docs/parity-plan.md.
 YOU MUST NOT: edit generated files, edit evidence by hand, mark a row 'done' without evidence, add accepted.json patterns broader than needed (anchor them on the field name and, where possible, the mission sku), commit.
 REPORT: counts from docs/missions-status.md, list of fixes (file:line, why), list of accepted differences with reasons, remaining TODO classes with blockers.
 ```

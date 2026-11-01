@@ -258,3 +258,15 @@ Open: the construction-end animation length is a guess (CONSTRUCTION_END_ANIM_MS
 
 ## C03-25 millionNewsFeed (Lead, RESOLVED)
 The original's first-frame company value does not include the rewards of the missions reached at load (they are paid after the first logic update): C03-25 952,000 (no magazine) vs 1,072,000 in ours; C05-27 1,141,000 (magazine) vs 1,216,000. Fix: ui/missions/system.ts counts `paidCoins`; ui/extras/journal.ts checks `companyValue - paidCoins` at load. C03, C04, C05, C13, C14, R04-g1, R05-g1, R06-g1 all EQUAL.
+
+## C35 visitCity rep 39 (worker dfr): original cannot start a visit offline
+- Three original runs (`tools/oracle/out/flow-mission-C35-39/`): the friends-bar NPC boxes never appear (loading spinner stays for 20+ s); "My Neighbors" shows an empty "Add Neighbors" popup. Mission 39 stays `up`. Original's neighbour/friend/partner saves are empty and no neighbour command is sent at boot.
+- Ours shows Ronald/Cindy/Sheik immediately per the code (`apps/client/src/ui/hud/friends.ts`, not run here), so a visit is possible in ours but not in the original: the visit-based classes (C35, C36, C32, C33, C34, C21, C22) cannot be compared until the lead decides how the original gets its offline neighbours.
+- Detail and screenshots: `tools/missions/worker-notes/C35.md`.
+
+## C36 visitPartner rep 65 (worker dfr): same blocker as C35
+- Original `partnersList` is empty and the friends bar never fills (`tools/oracle/out/flow-mission-C36-65/`). Mission 65 stays `up`. Decision needed with C35 (how the original gets offline partners/neighbours).
+
+## C27 investment rep 66 (worker dfr): the toolbar chart icon opens nothing in the original
+- `tools/oracle/out/flow-mission-C27-66/02-01-invest-menu.png` and `03-01b-invest-menu-2.png`: no window. `docs/visual-parity.md` Round 4 says the investment window is reached from the expansion popup's Invest button. Lead: confirm which entry is right, and how the original starts an investment offline (its "Send Investment Request" asks Facebook for friends).
+- C28 (investmentDone) depends on the same window: not run.

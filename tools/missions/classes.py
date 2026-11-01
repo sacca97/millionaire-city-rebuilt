@@ -10,7 +10,7 @@ Usage: python3 tools/missions/classes.py
 import collections, json
 from common import ROOT, OUT, load_missions, load_item_skus, load_item_keys, param_kind, reward_form
 
-DEFERRED_TYPES = {"upgrade", "collectUpgraded", "visitPartner", "visitCity", "investment", "investmentDone", "askForHelp", "beat"}
+DEFERRED_TYPES: set[str] = set()  # 2026-11-01: NPC friends (Rust server) made the social classes verifiable; none deferred any more
 
 
 def class_key(m, skus, keys):

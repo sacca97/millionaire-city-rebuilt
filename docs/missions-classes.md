@@ -4,8 +4,8 @@
 
 | Class | Type | Key | Members (default/alt) | Rep | Rep2 | Deferred |
 |---|---|---|---:|---|---|---|
-| C01 | askForHelp | `askForHelp|p:none|n:1|c:-|u:sku` | 1 (1/0) | 3 |  | yes |
-| C02 | beat | `beat|p:none|n:1|c:thr|u:lvl` | 2 (1/1) | 56 | 183 | yes |
+| C01 | askForHelp | `askForHelp|p:none|n:1|c:-|u:sku` | 1 (1/0) | 3 |  |  |
+| C02 | beat | `beat|p:none|n:1|c:thr|u:lvl` | 2 (1/1) | 56 | 183 |  |
 | C03 | bonus | `bonus|p:other|n:1|c:thr|u:sku` | 2 (2/0) | 25 |  |  |
 | C04 | bonus | `bonus|p:sku|n:1|c:thr|u:lvl` | 13 (2/11) | 29 | 99 |  |
 | C05 | bonus | `bonus|p:sku|n:1|c:thr|u:sku` | 3 (3/0) | 27 |  |  |
@@ -24,24 +24,24 @@
 | C18 | collect | `collect|p:sku|n:>1|c:-|u:lvl` | 12 (0/12) | 95 |  |  |
 | C19 | collect | `collect|p:sku|n:>1|c:-|u:sku` | 14 (3/11) | 32 | 255 |  |
 | C20 | collect | `collect|p:typeAndDuration|n:>1|c:-|u:lvl` | 6 (1/5) | 55 | 139 |  |
-| C21 | collectUpgraded | `collectUpgraded|p:nameType|n:>1|c:-|u:lvl` | 1 (0/1) | 104 |  | yes |
-| C22 | collectUpgraded | `collectUpgraded|p:nameType|n:>1|c:-|u:sku` | 25 (10/15) | 77 | 293 | yes |
+| C21 | collectUpgraded | `collectUpgraded|p:nameType|n:>1|c:-|u:lvl` | 1 (0/1) | 104 |  |  |
+| C22 | collectUpgraded | `collectUpgraded|p:nameType|n:>1|c:-|u:sku` | 25 (10/15) | 77 | 293 |  |
 | C23 | earn | `earn|p:other|n:1|c:thr|u:lvl` | 4 (2/2) | 43 | 98 |  |
 | C24 | earn | `earn|p:other|n:1|c:thr|u:sku` | 24 (8/16) | 45 | 308 |  |
 | C25 | giveEmail | `giveEmail|p:none|n:1|c:-|u:lvl` | 2 (1/1) | 64 | 94 |  |
 | C26 | instantBuild | `instantBuild|p:none|n:1|c:-|u:lvl` | 2 (1/1) | 5 | 91 |  |
-| C27 | investment | `investment|p:none|n:>1|c:-|u:lvl` | 6 (1/5) | 66 | 109 | yes |
-| C28 | investmentDone | `investmentDone|p:none|n:>1|c:-|u:lvl` | 6 (1/5) | 67 | 125 | yes |
+| C27 | investment | `investment|p:none|n:>1|c:-|u:lvl` | 6 (1/5) | 66 | 109 |  |
+| C28 | investmentDone | `investmentDone|p:none|n:>1|c:-|u:lvl` | 6 (1/5) | 67 | 125 |  |
 | C29 | moveHouse | `moveHouse|p:sku|n:1|c:-|u:lvl` | 1 (0/1) | 110 |  |  |
 | C30 | moveHouse | `moveHouse|p:subgroup|n:1|c:-|u:lvl` | 1 (1/0) | 87 |  |  |
 | C31 | nameCity | `nameCity|p:none|n:1|c:-|u:lvl` | 2 (1/1) | 1 | 89 |  |
-| C32 | upgrade | `upgrade|p:nameType|n:>1|c:-|u:sku` | 19 (6/13) | 40 | 280 | yes |
-| C33 | upgrade | `upgrade|p:sku|n:>1|c:-|u:lvl` | 14 (1/13) | 68 | 107 | yes |
-| C34 | upgrade | `upgrade|p:sku|n:>1|c:-|u:sku` | 6 (6/0) | 69 |  | yes |
-| C35 | visitCity | `visitCity|p:none|n:1|c:-|u:lvl` | 2 (1/1) | 39 | 97 | yes |
-| C36 | visitPartner | `visitPartner|p:none|n:>1|c:-|u:lvl` | 8 (1/7) | 65 | 132 | yes |
+| C32 | upgrade | `upgrade|p:nameType|n:>1|c:-|u:sku` | 19 (6/13) | 40 | 280 |  |
+| C33 | upgrade | `upgrade|p:sku|n:>1|c:-|u:lvl` | 14 (1/13) | 68 | 107 |  |
+| C34 | upgrade | `upgrade|p:sku|n:>1|c:-|u:sku` | 6 (6/0) | 69 |  |  |
+| C35 | visitCity | `visitCity|p:none|n:1|c:-|u:lvl` | 2 (1/1) | 39 | 97 |  |
+| C36 | visitPartner | `visitPartner|p:none|n:>1|c:-|u:lvl` | 8 (1/7) | 65 | 132 |  |
 
-In scope: 25 classes, 228 missions. Deferred: 11 classes, 90 missions.
+In scope: 36 classes, 318 missions. Deferred: 0 classes, 0 missions.
 
 ## Reward-shape classes (3 reward groups: base / A-B 1 / A-B 2)
 
