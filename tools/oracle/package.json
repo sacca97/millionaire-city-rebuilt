@@ -1,0 +1,9 @@
+{
+  "name": "@mcity/oracle",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Oracle harness: original Flash client (Electron 10 + Pepper Flash) for parity checks. Standalone, not a root workspace: a root npm install cannot touch its Electron.",
+  "devDependencies": {
+    "electron": "10.4.7"
+  }
+}

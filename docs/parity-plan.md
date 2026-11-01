@@ -1,6 +1,6 @@
 # Parity plan: TypeScript rewrite vs the original Millionaire City
 
-Handoff document. Goal: a TypeScript client (`apps/client`) that is equivalent to the original Flash game (0.501), running against the existing server (`apps/server`, which keeps the original save/protocol format). Written so another agent (e.g. Codex) can continue without this session's context.
+Handoff document. Goal: a TypeScript client (`apps/client`) that is equivalent to the original Flash game (0.501), running against the existing server (the server, now `apps/server-rs` (Rust), which keeps the original save/protocol format). Written so another agent (e.g. Codex) can continue without this session's context.
 
 Status snapshot: final handover; all subagents have finished and all test servers are stopped (no ports listening). Testing was deliberately stopped here. Results of the last runs: client 219 tests (28 files), server 106 (3 files), rules 15, `tsc --noEmit` clean in client and server. Detailed results: `docs/parity-audit.md` (formulas), `docs/visual-parity.md` (screens, Round 1-3 tables), `docs/tutorial-parity.md` (tutorial + save diff).
 
@@ -10,7 +10,7 @@ Status snapshot: final handover; all subagents have finished and all test server
 |---|---|---|
 | Client (Vite + PixiJS v8, DOM UI overlay) | `apps/client/src` | `game/` logic, `view/` rendering, `ui/<area>/` screens, `gui/` widget toolkit, `net/` protocol + command builders, `audio/` |
 | Ported rules library | `packages/rules` | pure TS: definitions, placement, income, timers, XP |
-| Server | `apps/server` | Express + SQLite JSON documents; extended with `commandHandlers/offline.ts` (ports of original Java semantics) |
+| Server | `apps/server-rs` (was `apps/server`, TypeScript, in git history) | axum + SQLite JSON documents; extended with `commandHandlers/offline.ts` (ports of original Java semantics) |
 | Original decompiled client | `decompiled/scripts/com/dchoc/dollars` | gitignored, regenerate (see below) |
 | Original Java backend (recovered) | `archive-recovery-2026-10-06/java/dollars` | `GamePlay.java`, `SecurityNormal.java`, `Server.java`, `Rules.java`; see `docs/archive-reference.md` |
 | Oracle harness (original Flash client running headless) | `tools/oracle` | the key tool for parity checks |
@@ -20,12 +20,12 @@ Nothing is committed. Untracked/modified: `apps/client/`, `packages/rules/`, `to
 
 ## 2. Setup from a clean checkout
 
-Original art, sprites and sounds are NOT in git (not redistributable; `NOTICE.md`). Regenerate locally. Needs Java, Python 3 with Pillow and numpy, `rsvg-convert`, Node 22.
+The optimised art (`apps/client/public-opt/`) is committed, so a checkout renders as is; no licence is known for it (`NOTICE.md`). The full-size `apps/client/public/` is NOT in git; regenerate it locally. Needs Java, Python 3 with Pillow and numpy, `rsvg-convert`, Node 22.
 
 ```text
 npm ci
 npm run build -w @mcity/shared
-# FFDec 26.0.0 -> generated/tools/ffdec-26.0.0/ffdec.jar (npm run prepare-client in apps/server downloads it too)
+# FFDec 26.0.0 -> generated/tools/ffdec-26.0.0/ffdec.jar (npm run prepare-client downloads it too)
 java -jar generated/tools/ffdec-26.0.0/ffdec.jar -export script decompiled assets/dchoc1-a.akamaihd.net/0.501/mcity/Datas/Dollars.swf
 python3 tools/export_all_items.py && python3 tools/export_hq.py && python3 tools/export_framerates.py
 python3 tools/export_gui.py --jobs 4          # apps/client/public/gui (113 MB)
@@ -37,7 +37,7 @@ Run:
 
 ```text
 # game server on an isolated DB (never reuse another agent's DB):
-cd apps/server && MCITY_DB_PATH=/tmp/mc.sqlite MCITY_HTTP_PORT=31803 MCITY_HTTPS_PORT=31804 MCITY_FACEBOOK_PORT=31805 npx tsx src/main.ts
+make server && MCITY_DB_PATH=/tmp/mc.sqlite MCITY_HTTP_PORT=31803 MCITY_HTTPS_PORT=31804 MCITY_FACEBOOK_PORT=31805 apps/server-rs/target/release/mcity-server
 # client dev server (proxies /Game and /mcity to the server):
 cd apps/client && npx vite --host 127.0.0.1                      # http://127.0.0.1:5173
 # production build served by the game server at http://127.0.0.1:<MCITY_HTTP_PORT>/ :
@@ -51,9 +51,8 @@ Dev helpers in the browser: `window.__mcity` ({conn, game, city, defs, audio}), 
 Automated (must stay green; run before and after every change):
 
 ```text
-npm run test:rewrite                      # client + server + rules suites
+make test                                 # client + rules suites and cargo test (Rust server); make conformance for the black-box suite
 cd apps/client && npx tsc --noEmit        # client typecheck
-cd apps/server && npx tsc --noEmit
 ```
 
 Last known results: client 219 tests, server 106, rules 15 (27+ test files). Golden numeric tests: `apps/client/test/parity.test.ts`, `apps/server/test/parity.test.ts`. End-to-end through a real server on a temp DB: `apps/client/test/commands.integration.test.ts`, `apps/client/test/game.integration.test.ts`.
@@ -123,7 +122,7 @@ C. Quality
 
 D. Shipping (not started)
 9. Production build is ~500 MB (unpruned sprites/gui); needs pruning for distribution.
-10. Original assets are not redistributable (`NOTICE.md`): a bring-your-own-assets/regeneration step (section 2) must be part of any release.
+10. No licence is known for the original assets (`NOTICE.md`); the optimised art is committed in `apps/client/public-opt/`.
 11. No Electron wrapper/installer for the rewrite (legacy launcher in `apps/desktop` unchanged); the server serves `apps/client/dist` at `/` when present.
 12. Nothing is committed; the work is uncommitted on `main` (new `apps/client/`, `packages/rules/`, `tools/`, `docs/`, server edits).
 

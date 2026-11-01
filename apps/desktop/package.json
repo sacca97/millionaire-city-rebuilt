@@ -1,18 +1,15 @@
 {
   "name": "@mcity/desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "main": "./dist/main.js",
+  "description": "Millionaire City desktop app (Tauri 2): system web view + the embedded Rust game server",
   "scripts": {
-    "prebuild": "node ../../scripts/checkDependencies.cjs tsc",
-    "build": "npm run build -w @mcity/shared && npm run build -w @mcity/server && tsc -p tsconfig.json",
-    "predev": "node ../../scripts/checkDependencies.cjs tsc electron",
-    "dev": "npm run build && electron ./dist/main.js",
-    "prestart": "node ../../scripts/checkDependencies.cjs electron",
-    "start": "electron ./dist/main.js"
+    "icons": "tauri icon assets/window-icon.png --output src-tauri/icons",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
   },
   "devDependencies": {
-    "electron": "10.4.7",
-    "typescript": "^5.8.3"
+    "@tauri-apps/cli": "2.12.4"
   }
 }

@@ -1,0 +1,21 @@
+{
+  "createEmptyCollectiblesDocument": {
+    "collectiblesList": [
+      {
+        "Objects": [],
+        "skus": ""
+      },
+      {
+        "Rewards": [],
+        "skus": ""
+      },
+      {
+        "Pending": [],
+        "tupla": ""
+      }
+    ]
+  },
+  "createEmptyCollectiblePendingDocument": {
+    "collectiblePendingList": []
+  }
+}

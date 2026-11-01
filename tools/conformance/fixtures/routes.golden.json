@@ -1,0 +1,561 @@
+{
+  "FB GET crossdomain": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "sha256": "6e986239a383342d456e18db1c44105be5c43107d40af297d4f85948b54ece24",
+    "length": 249
+  },
+  "FB GET picture": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/gif",
+      "cache-control": "no-store"
+    },
+    "sha256": "22816a00dfe9fcdc30063d22717ab9cbab3aeb2a8e9844e9d774d256dc48b7c8",
+    "length": 35
+  },
+  "FB GET unknown 404": {
+    "status": 404,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'none'",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "77c3dc7f5e43a0f671013c1c6f11857f83cc406fd711d6777ed4819fab8a9e78",
+    "length": 155
+  },
+  "GET asset-directory-404": {
+    "status": 404,
+    "headers": {},
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "length": 0
+  },
+  "GET asset-missing-404": {
+    "status": 404,
+    "headers": {},
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "length": 0
+  },
+  "GET asset-traversal-404": {
+    "status": 404,
+    "headers": {},
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "length": 0
+  },
+  "GET asset-traversal-dotdot-404": {
+    "status": 404,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'none'",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "ffc372a6ce855e15cd865f356af0704db5bc69cee2cd3f7e3ac212d13f8996a0",
+    "length": 151
+  },
+  "GET cbar-css": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/css; charset=UTF-8",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "29f9908eb77d4398ee80034c271b0e56d505d43092f1d0f43657d2f9d1d3368d",
+    "length": 3530
+  },
+  "GET cbar-extension-htm": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "17016f15bd52e5751eab96519e2db327ce9cd31214ada26d1d96d898036ad522",
+    "length": 1785
+  },
+  "GET cbar-htm": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=UTF-8",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "17016f15bd52e5751eab96519e2db327ce9cd31214ada26d1d96d898036ad522",
+    "length": 1785
+  },
+  "GET cbar-missing-404": {
+    "status": 404,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'none'",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "e4f40d5091ba322ccca1213a94d50557309ba6b90d7e88ac4bcbaa7adc71da88",
+    "length": 159
+  },
+  "GET commerce-icon-existing": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "b3cbb8a17cb7d77e5776a98372acf5b8c74f732bb37a2158b851b507edb11127",
+    "length": 8327
+  },
+  "GET commerce-icon-missing": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "b3cbb8a17cb7d77e5776a98372acf5b8c74f732bb37a2158b851b507edb11127",
+    "length": 8327
+  },
+  "GET commerce-icon-missing-non-png-404": {
+    "status": 404,
+    "headers": {},
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "length": 0
+  },
+  "GET commerce-swf-existing": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/x-shockwave-flash",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "42e5f0f539bd620662324c602c5b5b7229d96ebdbb7cf325e8a95153ba67d318",
+    "length": 2132
+  },
+  "GET commerce-swf-missing": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/x-shockwave-flash",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "42e5f0f539bd620662324c602c5b5b7229d96ebdbb7cf325e8a95153ba67d318",
+    "length": 2132
+  },
+  "GET crossdomain": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "sha256": "75ed11b58c6a7f5348911d1030710ac7f7589de486dfaa423451f7e13158b9e3",
+    "length": 178
+  },
+  "GET dollars-swf": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/x-shockwave-flash",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "2e2271d28f4c609ef5b669a727aa3046a644e9a940d16318e249b8b26f2fb045",
+    "length": 1166736
+  },
+  "GET event-track-get": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/plain; charset=utf-8"
+    },
+    "sha256": "2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df",
+    "length": 2
+  },
+  "GET extension-less-asset": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "7daa57034c3d6360279bcabc2abb3c73ef3be7c045395c3e81e5a1f5dd967bfb",
+    "length": 895
+  },
+  "GET favicon": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/x-icon",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "8c273b0a53e182e3d63a6978f6ceafe4650ebdd2d838202a85d16f5dcb255c03",
+    "length": 285478
+  },
+  "GET feed-existing": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/jpeg",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "a12416b19191e7e3fea10384cf7bd043d1b9cdf57c93188491d4f1afb7ece3e9",
+    "length": 35557
+  },
+  "GET feed-missing-gif-404": {
+    "status": 404,
+    "headers": {},
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "length": 0
+  },
+  "GET feed-missing-jpeg": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/jpeg",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "a12416b19191e7e3fea10384cf7bd043d1b9cdf57c93188491d4f1afb7ece3e9",
+    "length": 35557
+  },
+  "GET feed-missing-jpg": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/jpeg",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "a12416b19191e7e3fea10384cf7bd043d1b9cdf57c93188491d4f1afb7ece3e9",
+    "length": 35557
+  },
+  "GET feed-missing-png": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "67621d746cd372699fc57dc8d3d8df6eeccaba22c973e69828a0346e4690cb38",
+    "length": 48249
+  },
+  "GET game-get-404": {
+    "status": 404,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'none'",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "81dc88ffb5b47818806b53aedb6675dbfe96a316284b380d1b72100365977112",
+    "length": 143
+  },
+  "GET health": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "sha256": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+    "length": 11
+  },
+  "GET launcher": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'self'; connect-src 'self' https://graph.facebook.com https://api.facebook.com; frame-src 'self'; child-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "68a48afb941284fd9b9e3b5b462f513d5bdad3dbe47584c0082c2915dc7d75c7",
+    "length": 66693
+  },
+  "GET launcher-all": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'self'; connect-src 'self' https://graph.facebook.com https://api.facebook.com; frame-src 'self'; child-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "a0447baa99ffc23f7830da51a5602cf545e414fca0923239e0ac5d9b0bcd62af",
+    "length": 66693
+  },
+  "GET launcher-climate": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'self'; connect-src 'self' https://graph.facebook.com https://api.facebook.com; frame-src 'self'; child-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "08a20fb408d88047a6fafc41cc985f6678c1c0e53f979b077e3c836282e44efd",
+    "length": 66693
+  },
+  "GET launcher-debug": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'self'; connect-src 'self' https://graph.facebook.com https://api.facebook.com; frame-src 'self'; child-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "b8c8ec7b2200110cfd6caee98de44406cf8571f64e0982ee8068053af7d88bc1",
+    "length": 66693
+  },
+  "GET launcher-falsy": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'self'; connect-src 'self' https://graph.facebook.com https://api.facebook.com; frame-src 'self'; child-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "68a48afb941284fd9b9e3b5b462f513d5bdad3dbe47584c0082c2915dc7d75c7",
+    "length": 66693
+  },
+  "GET launcher-oldItems": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; object-src 'self'; connect-src 'self' https://graph.facebook.com https://api.facebook.com; frame-src 'self'; child-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "bdd63c0df51f887fa6c9c69ad833153537d16b6575dbeac81faef07fce10fe57",
+    "length": 66693
+  },
+  "GET local-profile": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "sha256": "f87e79c2e6729b0a046a8d6e439c5bdde7c9923e8ab8252c73e2534b0119396f",
+    "length": 141
+  },
+  "GET local-profile-picture-default": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/gif",
+      "cache-control": "no-store"
+    },
+    "sha256": "22816a00dfe9fcdc30063d22717ab9cbab3aeb2a8e9844e9d774d256dc48b7c8",
+    "length": 35
+  },
+  "GET local-resources": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "sha256": "4010a37ef0e2143f3803ea4db6d18a9dc8ad98e12214cf8f4f2148be2949d07d",
+    "length": 109
+  },
+  "GET locale-en": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/plain; charset=UTF-8",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "2ddba5117f7952dbfe57847089edb74e4996195af62c430bac89a3ed537f6604",
+    "length": 108680
+  },
+  "GET locale-en-lowercase-path": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/plain; charset=UTF-8",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "2ddba5117f7952dbfe57847089edb74e4996195af62c430bac89a3ed537f6604",
+    "length": 108680
+  },
+  "GET mission-icon-existing": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "e834a14acb41ea70d142ee23dc869da6b8ac54d3864a5e12c556dfc2850cbae7",
+    "length": 10121
+  },
+  "GET mission-icon-missing": {
+    "status": 200,
+    "headers": {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "e834a14acb41ea70d142ee23dc869da6b8ac54d3864a5e12c556dfc2850cbae7",
+    "length": 10121
+  },
+  "GET private-swf": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/x-shockwave-flash",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "2e2271d28f4c609ef5b669a727aa3046a644e9a940d16318e249b8b26f2fb045",
+    "length": 1166736
+  },
+  "GET root-404-without-client": {
+    "status": 404,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'none'",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "52c1e7a2c36be28c42455fe1572d7d7918c3180cad99a2b82daa2a38a7e7bb23",
+    "length": 139
+  },
+  "GET rules-collectiblesDefinitions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "sha256": "66b028d4268140f496b610e1673c4f7901235a1c8f21680d57067338b6e027e7",
+    "length": 17638
+  },
+  "GET rules-collectiblesGroupsDefinitions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "sha256": "ee163dee8d8426e0b2b22e3a197d4524e31d9271f8b9931dc581f4178c58aa9f",
+    "length": 2090
+  },
+  "GET rules-collectiblesRewardDefinitions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "sha256": "71891a0716deb1883fbabb49e3cd81558f6792237b6c9c642c8a4edf4ecde77a",
+    "length": 1911
+  },
+  "GET rules-commerceDefinitions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "sha256": "16e111d712ee8ef864b28d3a48fe987caa132ec8700ebfbb490a938ba20a256d",
+    "length": 29909
+  },
+  "GET rules-contracts": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "4c818f739dc23755baba996dcd29e21cfd4c7abdb4b98d48a684c64fa9f706f6",
+    "length": 48690
+  },
+  "GET rules-dailyRewards": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "1c26fd9aeb3eb88e3212a0888f2f9f871fafde273418a7dadae88ef8e89afca7",
+    "length": 2359
+  },
+  "GET rules-decorationDefinitions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "sha256": "65498342be609851809ef390f85e437133b4fefcf0b67f9ea4da57568f1e1b39",
+    "length": 45338
+  },
+  "GET rules-itemDefinitions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "sha256": "19dec6867ba0740c99c6e3d802ca4fb827e50ee868c2011c7d1163b3bf890b0e",
+    "length": 52293
+  },
+  "GET rules-missionDefinitions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "fbd0c5c02ad71e398a7892a73fa05cf5007d62b17e47173badd59432674152f6",
+    "length": 109292
+  },
+  "GET rules-settings": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "7daa57034c3d6360279bcabc2abb3c73ef3be7c045395c3e81e5a1f5dd967bfb",
+    "length": 895
+  },
+  "GET rules-wonderDefinitions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "cache-control": "public, max-age=3600"
+    },
+    "sha256": "ea99a703f6512457983877bf972a35d5434d6ead9dcbd2ba390ca0262290521e",
+    "length": 9961
+  },
+  "GET rules-XPTable": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml",
+      "cache-control": "public, max-age=86400"
+    },
+    "sha256": "0cd2f002595a03f1ac6fd267da7b9bafe17f43c882d94f8da61c214a3425f5c0",
+    "length": 50047
+  },
+  "GET splash": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/x-shockwave-flash",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "feed085569b3bdec1b03ddc8b9ab6412875097aeb2e28036fbbc36b4e9260931",
+    "length": 587
+  },
+  "GET tutorial-hq-positions": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml",
+      "cache-control": "public, max-age=0"
+    },
+    "sha256": "bb626f127e3d628d69c15109a7fed028ed101023e2f68722e642ae78c2d1ca2e",
+    "length": 304
+  },
+  "GET unknown-route-404": {
+    "status": 404,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy": "default-src 'none'",
+      "x-content-type-options": "nosniff"
+    },
+    "sha256": "16a808452c8a165aa6d7758f86fd6251c5b1aca568b519ed25ff4eae3d492a5b",
+    "length": 151
+  },
+  "GET userdata-fan": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "sha256": "3c3cd2d667ec82a7b9c5b88694253f043089e1589c754744eea3e9b29d5b07b6",
+    "length": 30
+  },
+  "GET userdata-giftsList": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "sha256": "260f759b8362c68c3335a53ba74e9f8fed629c91f1abe283cb948a0a32893afd",
+    "length": 13
+  },
+  "GET vip-submit /mcity/0.501/Datas/userData/checkSendMail.xml": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "sha256": "09cf58f045ccc3a2cbd54a16e611462b54f8eb2f20920b4fe125f72df59483cb",
+    "length": 39
+  },
+  "GET vip-submit /registration/register": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "sha256": "09cf58f045ccc3a2cbd54a16e611462b54f8eb2f20920b4fe125f72df59483cb",
+    "length": 39
+  },
+  "GET vip-submit /registration/register/": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "sha256": "09cf58f045ccc3a2cbd54a16e611462b54f8eb2f20920b4fe125f72df59483cb",
+    "length": 39
+  }
+}

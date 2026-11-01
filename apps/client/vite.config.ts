@@ -31,7 +31,7 @@ function webpFallback(dir: string | false): Plugin {
   };
 }
 
-/** Write .br/.gz next to every text asset in the build output (served by apps/server/src/clientStatic.ts). */
+/** Write .br/.gz next to every text asset in the build output (served by apps/server-rs/src/client_static.rs). */
 function precompress(): Plugin {
   const TEXT = /\.(js|css|json|html|svg|txt|xml|mjs)$/;
   let out = "";

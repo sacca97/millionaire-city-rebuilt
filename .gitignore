@@ -6,7 +6,6 @@ coverage/
 tmp/
 generated/
 release/
-apps/server/.data/
 apps/desktop/out/
 apps/desktop/dist/
 /Millionaire City/
@@ -82,5 +81,11 @@ apps/client/public-bak/
 # machine-specific evidence (absolute /tmp paths and hashes); regenerate with tools/missions/verify.py
 tools/missions/evidence/
 
-# desktop bundle build output
-tools/app/stage/
+# desktop app build output
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# Rust server build output
+apps/server-rs/target*/
+!apps/server-rs/tests/fixtures/*.sqlite
+__pycache__/

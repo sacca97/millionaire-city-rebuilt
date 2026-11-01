@@ -1,0 +1,76 @@
+{
+  "DEFAULT_CITY_NAME": "Chocolate Fields",
+  "DEFAULT_CITY_NAME_CODES": "67,104,111,99,111,108,97,116,101,32,70,105,101,108,100,115",
+  "DEFAULT_ABANDON_MINUTES": 60,
+  "DEFAULT_ABANDON_TIME_PERCENTAGE": 100,
+  "STARTER_WORLD_SID": "1",
+  "STARTER_COMPANY_MINE_SID": "1",
+  "STARTER_COMPANY_RIVAL_SID": "2",
+  "STARTER_COIN_BALANCE": 380000,
+  "STARTER_COMPANY_VALUE": 720000,
+  "NPC_PRIMARY_USER_ID": 100,
+  "NPC_SHEIK_USER_ID": 101,
+  "TUTORIAL_COMPLETED_HQ_TILE": {
+    "x": "-1",
+    "y": "-3"
+  },
+  "TUTORIAL_COMPLETED_HOUSE_TILE": {
+    "x": "4",
+    "y": "2"
+  },
+  "TUTORIAL_COMPLETED_TREE_TILE": {
+    "x": "4",
+    "y": "1"
+  },
+  "TUTORIAL_COMPLETED_TERRAIN_TILES": [
+    "5:2",
+    "5:3"
+  ],
+  "TUTORIAL_COMPLETED_ROAD_TILES": [
+    "3:4",
+    "4:4"
+  ],
+  "TUTORIAL_COMPLETED_INITIAL_MISSIONS": [
+    "1",
+    "2",
+    "5",
+    "10"
+  ],
+  "COMPLETED_MISSION_POLL_RULES": [
+    {
+      "sku": "2",
+      "countKey": "buycommerce_pizza",
+      "minCount": 1
+    },
+    {
+      "sku": "5",
+      "countKey": "instantBuild",
+      "minCount": 1
+    },
+    {
+      "sku": "18",
+      "countKey": "checkInfluencecommerce_pizza",
+      "minCount": 1
+    },
+    {
+      "sku": "31",
+      "countKey": "collectcommerce_pizza",
+      "minCount": 1
+    }
+  ],
+  "STALE_TUTORIAL_POLL_MISSION_SKUS": [
+    "10",
+    "25",
+    "26"
+  ],
+  "UNLOCKED_MISSION_RULES": [
+    {
+      "sku": "18",
+      "requiredSku": "2"
+    },
+    {
+      "sku": "31",
+      "requiredSku": "18"
+    }
+  ]
+}

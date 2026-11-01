@@ -4,16 +4,18 @@
 import { chromium } from "/home/sacca/.bun/install/cache/playwright-core/1.62.1@@@1/index.mjs";
 import { spawn } from "node:child_process";
 import { seedFlow, statOf } from "./flowlib.mjs";
+import { rustServerSpecs } from "./serverCmd.mjs";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
 import { fileURLToPath } from "node:url"; import { createRequire } from "node:module";
 const here = path.dirname(fileURLToPath(import.meta.url)), root = path.resolve(here, "../..");
-const Database = createRequire(path.join(root, "apps/server/package.json"))("better-sqlite3");
+const Database = createRequire(path.join(root, "tools/conformance/package.json"))("better-sqlite3");
 const OUT = process.env.OUT, PORT = Number(process.env.PORT ?? 31863), URL = process.env.PREVIEW ?? "http://localhost:5176/";
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mcity-ours-")), dbPath = path.join(tmp, "ours.sqlite");
 const slog = path.join(OUT, "server.log");
-const srv = spawn(process.execPath, ["--import", "tsx", "src/main.ts"], { cwd: path.join(root, "apps/server"), detached: true, stdio: ["ignore", fs.openSync(slog, "w"), fs.openSync(slog, "a")],
-  env: { ...process.env, MCITY_CMDLOG: path.join(OUT, "cmds.jsonl"), NODE_OPTIONS: `--require ${path.join(here, "cmdlog.cjs")}`, MCITY_DB_PATH: dbPath, MCITY_HTTP_PORT: PORT, MCITY_HTTPS_PORT: PORT + 1, MCITY_FACEBOOK_PORT: PORT + 2 } });
+const [px, rsSpec] = rustServerSpecs({ pubBase: PORT, dbPath, cmdlog: path.join(OUT, "cmds.jsonl"), tmp });
+const extra = [spawn(px.cmd, px.args, { ...px.opts, detached: true, stdio: ["ignore", fs.openSync(path.join(OUT, px.log), "w"), fs.openSync(path.join(OUT, px.log), "a")] })];
+const srv = spawn(rsSpec.cmd, rsSpec.args, { ...rsSpec.opts, detached: true, stdio: ["ignore", fs.openSync(slog, "w"), fs.openSync(slog, "a")] });
 fs.writeFileSync(path.join(OUT, "server.pid"), String(srv.pid));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 for (let i = 0; ; i++) { try { if ((await fetch(`http://127.0.0.1:${PORT}/health`)).ok) break; } catch {} if (i > 60) throw new Error("server"); await sleep(500); }
@@ -45,6 +47,7 @@ const h = {
 try { await mod.default(h); } catch (e) { console.error(e); try { await h.shot("failure"); } catch {} }
 await b.close();
 try { process.kill(-srv.pid, "SIGTERM"); } catch {}
+for (const e of extra) { try { process.kill(-e.pid, "SIGTERM"); } catch {} }
 if (srv.exitCode === null) {
   await new Promise((resolve) => {
     const timer = setTimeout(resolve, 3000);
@@ -52,5 +55,6 @@ if (srv.exitCode === null) {
   });
 }
 if (srv.exitCode === null) { try { process.kill(-srv.pid, "SIGKILL"); } catch {} }
+for (const e of extra) { try { process.kill(-e.pid, "SIGKILL"); } catch {} }
 fs.rmSync(tmp, { recursive: true, force: true });
 process.exit(0);

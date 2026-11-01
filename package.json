@@ -6,35 +6,26 @@
   "author": "Millionaire City Revival contributors",
   "workspaces": [
     "apps/client",
-    "apps/server",
+    "tools/conformance",
     "packages/*"
   ],
   "scripts": {
-    "dev:server": "npm run dev -w @mcity/server",
+    "dev:server": "cd apps/server-rs && cargo run --release",
     "dev:client": "npm run dev -w @mcity/client",
-    "dev:desktop": "npm --prefix tools/app ci && npm --prefix tools/app run start",
     "build": "npm run build:client",
     "build:client": "npm run build -w @mcity/shared && npm run build -w @mcity/client",
     "start": "npm run build:client && npm run dev:server",
-    "test": "npm run test -w @mcity/client && npm run test -w @mcity/server && npm run test -w @mcity/rules",
+    "test": "npm run test -w @mcity/client && npm run test -w @mcity/rules && cd apps/server-rs && cargo test",
     "typecheck": "npm run typecheck -w @mcity/client",
-    "package:win": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --win --x64",
-    "package:linux": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --linux --x64",
-    "package:mac": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --mac",
-    "package:mac:arm64": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --mac --arm64",
-    "package:mac:x64": "npm --prefix tools/app ci && node tools/app/build.mjs --pack --mac --x64",
-    "report:missing-assets": "npm run report:missing-assets -w @mcity/server"
-  },
-  "dependencies": {
-    "@mcity/shared": "^0.1.0",
-    "better-sqlite3": "^11.10.0",
-    "express": "^4.22.2",
-    "selfsigned": "^3.0.1"
+    "conformance": "npm run conformance -w @mcity/conformance",
+    "prepare-client": "node tools/prepare-client.mjs",
+    "dev:desktop": "npm --prefix apps/desktop ci && npm --prefix apps/desktop run dev",
+    "package": "npm --prefix apps/desktop ci && npm --prefix apps/desktop run build"
   },
   "engines": {
     "node": ">=22.12"
   },
-  "devDependencies": {
-    "esbuild": "^0.28.0"
+  "dependencies": {
+    "@mcity/shared": "^0.1.0"
   }
 }

@@ -1,4 +1,4 @@
-name: Build Portable Apps
+name: Build Desktop Apps
 
 on:
   workflow_dispatch:
@@ -13,24 +13,30 @@ jobs:
         include:
           - label: Windows x64
             os: windows-latest
-            package_script: package:win
+            bundles: nsis
             artifact_name: millionaire-city-windows-x64
           - label: Linux x64
-            os: ubuntu-latest
-            package_script: package:linux
+            os: ubuntu-22.04
+            bundles: deb,appimage,rpm
             artifact_name: millionaire-city-linux-x64
           - label: macOS Apple Silicon
             os: macos-latest
-            package_script: package:mac:arm64
+            bundles: dmg
             artifact_name: millionaire-city-macos-arm64
           - label: macOS Intel x64
             os: macos-15-intel
-            package_script: package:mac:x64
+            bundles: dmg
             artifact_name: millionaire-city-macos-x64
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Install Tauri system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev patchelf file
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -39,51 +45,38 @@ jobs:
           cache: npm
           cache-dependency-path: |
             package-lock.json
-            tools/app/package-lock.json
+            apps/desktop/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+          key: cargo-tauri-${{ matrix.os }}-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock', 'apps/server-rs/Cargo.lock') }}
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Build desktop package
-        run: npm run ${{ matrix.package_script }}
-
-      - name: Smoke-test the staged game server
-        shell: bash
         run: |
-          stage="tools/app/stage"
-          node_path="$stage/runtime/node/node"
-          [ -x "$node_path" ] || node_path="$stage/runtime/node/node.exe"
-          smoke_log="$RUNNER_TEMP/mcity-backend-smoke.log"
+          npm ci
+          npm --prefix apps/desktop ci
 
-          MCITY_DB_PATH="$RUNNER_TEMP/mcity-smoke.sqlite" \
-          MCITY_DISABLE_FB_SHIM=1 \
-          MCITY_HTTP_PORT=0 \
-          MCITY_HTTPS_PORT=0 \
-          "$node_path" "$stage/apps/server/dist/main.js" >"$smoke_log" 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+      # beforeBuildCommand (apps/desktop/scripts/prepare.mjs) builds the web client; cargo builds the Tauri shell with the game server embedded.
+      # Build on the runner's own OS and CPU: no cross-compiling.
+      - name: Build the desktop app
+        run: npm --prefix apps/desktop run build -- --bundles ${{ matrix.bundles }}
 
-          for attempt in {1..30}; do
-            if grep -q "Launcher available" "$smoke_log"; then
-              kill "$server_pid"
-              wait "$server_pid" || true
-              trap - EXIT
-              exit 0
-            fi
-            if ! kill -0 "$server_pid" 2>/dev/null; then
-              cat "$smoke_log"
-              exit 1
-            fi
-            sleep 1
-          done
-
-          cat "$smoke_log"
-          echo "The staged backend did not become ready in time."
-          exit 1
-
-      - name: Upload package
+      - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: tools/app/release/*.zip
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+            apps/desktop/src-tauri/target/release/bundle/rpm/*.rpm
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error

@@ -71,7 +71,7 @@ were already centred). At 760x600 the layout is now pixel-aligned with the origi
 ## Reproduce
 ```
 node tools/oracle/run.mjs hud-tour | ui-tour | build-flow          # original; outputs in tools/oracle/out/<scenario>
-# ours: MCITY_DB_PATH=... MCITY_HTTP_PORT=31843 MCITY_HTTPS_PORT=31844 MCITY_FACEBOOK_PORT=31845 (apps/server: npx tsx src/main.ts)
+# ours: MCITY_DB_PATH=... MCITY_HTTP_PORT=31843 MCITY_HTTPS_PORT=31844 MCITY_FACEBOOK_PORT=31845 (apps/server-rs: target/release/mcity-server)
 #       node tools/oracle/seed-post-tutorial.cjs <db>;  MCITY_SERVER=http://127.0.0.1:31843 npx vite --port 5175 (apps/client)
 #       CHROME=... node tools/oracle/ours-shot.mjs <prefix> 760 600 '[["wait",3000],["shot","a"]]' http://localhost:5175/
 ```

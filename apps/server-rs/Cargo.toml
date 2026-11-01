@@ -1,0 +1,50 @@
+[package]
+name = "mcity-server"
+version = "0.1.0"
+edition = "2021"
+description = "Offline Millionaire City server (replaces the former TypeScript server, see git history)"
+publish = false
+
+[[bin]]
+name = "mcity-server"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.8"
+axum-server = { version = "0.7", default-features = false, features = ["tls-rustls-no-provider"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time", "fs"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+regex = "1"
+hmac = "0.12"
+sha2 = "0.10"
+md-5 = "0.10"
+rand = "0.8"
+rsa = "0.9"
+base64 = "0.22"
+flate2 = "1"
+time = "0.3"
+percent-encoding = "2"
+bytes = "1"
+http-body-util = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+indexmap = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+# docs/rust-server-performance.md. panic stays "unwind": game.rs turns a panicking command handler into the TS `offlineError`
+# response with catch_unwind.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+# Dependencies are optimised in debug builds too: the RSA-2048 key generation of the two self-signed certificates takes ~7 s
+# unoptimised and ~0.1 s optimised, which dominates `cargo run` / debug conformance start-up.
+[profile.dev.package."*"]
+opt-level = 3

@@ -1,0 +1,17 @@
+{
+  "name": "@mcity/conformance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Black-box conformance suite: starts the Millionaire City server binary and tests it over HTTP(S) and its SQLite file",
+  "scripts": {
+    "conformance": "vitest run --config vitest.config.ts",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "vitest": "^3.2.4"
+  }
+}

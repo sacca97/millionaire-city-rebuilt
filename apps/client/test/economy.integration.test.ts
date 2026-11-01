@@ -8,11 +8,10 @@ import { Game, type GameItem } from "../src/game/game";
 import { RENT_MODE, STATE_ID } from "../src/net/commands";
 import { parseWorld, type WorldState } from "../src/model/save";
 import { GameConnection } from "../src/net/protocol";
-import { createServerApp } from "../../server/src/serverApp";
-import { getServerConfig } from "../../server/src/config";
+import { setDocument, startTestServer, type TestServer } from "./rustServer";
 import { fetchText, loadDefsSync } from "./helpers";
 
-const apps: Array<ReturnType<typeof createServerApp>> = [];
+const apps: TestServer[] = [];
 afterEach(async () => {
   while (apps.length > 0) await apps.pop()?.stop();
 });
@@ -29,11 +28,9 @@ function advance(game: Game, ms: number): void {
 }
 
 async function startServer(dbPath: string) {
-  const config = { ...getServerConfig(), dbPath, useHttpsFacebookShim: false, httpPort: 0, httpsPort: 0 };
-  const app = createServerApp(config);
+  const app = await startTestServer(dbPath);
   apps.push(app);
-  await app.start();
-  const conn = new GameConnection({ baseUrl: `http://127.0.0.1:${config.httpPort}`, uid: config.launcherUserId });
+  const conn = new GameConnection({ baseUrl: app.baseUrl, uid: app.uid });
   await conn.login();
   const dbWorld = async (): Promise<WorldState> => parseWorld((await conn.query("get_world", { targetUserId: 1 }))!._dat);
   return { app, conn, dbWorld };

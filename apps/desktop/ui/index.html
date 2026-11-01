@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Millionaire City</title>
+<style>
+  html, body { height: 100%; margin: 0; background: #87ceeb; font: 18px system-ui, sans-serif; color: #12304a; }
+  body { display: flex; align-items: center; justify-content: center; text-align: center; }
+  #err { display: none; max-width: 36em; white-space: pre-wrap; color: #7a1010; }
+</style>
+<div id="msg">Starting Millionaire City...</div>
+<div id="err"></div>
+<script>
+  // called by the Rust side when the embedded server could not start
+  window.showError = function (text) {
+    document.getElementById("msg").style.display = "none";
+    var e = document.getElementById("err");
+    e.style.display = "block";
+    e.textContent = "The game server could not start.\n\n" + text;
+  };
+</script>

@@ -2,15 +2,14 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Game } from "../src/game/game";
 import { parseWorld, type WorldState } from "../src/model/save";
 import { GameConnection } from "../src/net/protocol";
-import { createServerApp } from "../../server/src/serverApp";
-import { getServerConfig } from "../../server/src/config";
+import { setDocument, startTestServer, type TestServer } from "./rustServer";
 import { fetchText, loadDefsSync } from "./helpers";
 
-const apps: Array<ReturnType<typeof createServerApp>> = [];
+const apps: TestServer[] = [];
 afterEach(async () => {
   while (apps.length > 0) await apps.pop()?.stop();
 });
@@ -18,11 +17,9 @@ afterEach(async () => {
 const tmpDb = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mcity-game-")), "save.sqlite");
 
 async function startServer(dbPath: string) {
-  const config = { ...getServerConfig(), dbPath, useHttpsFacebookShim: false, httpPort: 0, httpsPort: 0 };
-  const app = createServerApp(config);
+  const app = await startTestServer(dbPath);
   apps.push(app);
-  await app.start();
-  const conn = new GameConnection({ baseUrl: `http://127.0.0.1:${config.httpPort}`, uid: config.launcherUserId });
+  const conn = new GameConnection({ baseUrl: app.baseUrl, uid: app.uid });
   await conn.login();
   const dbWorld = async (): Promise<WorldState> => parseWorld((await conn.query("get_world", { targetUserId: 1 }))!._dat);
   return { app, conn, dbWorld };
@@ -200,5 +197,106 @@ describe("Game core loop against the real server", () => {
     game.sellItem(house.sid);
     expect(game.profile.coins).toBe(c + refund);
     await expectSynced(game, dbWorld, "demolished");
+  });
+});
+
+/** Finds the player's company element (whose="0") in the stored universe and returns its child list. */
+function myCompanyChildren(node: unknown): unknown[] | undefined {
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = myCompanyChildren(child);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (node && typeof node === "object") {
+    const o = node as Record<string, unknown>;
+    if (Array.isArray(o.Company) && String(o.whose) === "0") return o.Company;
+    for (const value of Object.values(o)) {
+      const found = myCompanyChildren(value);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+describe("save with an item whose definition is not served", () => {
+  // Game.boot (game.ts) keeps such an item in the save untouched, does not simulate it and warns (pre-fix: Economy.nodeOf crash).
+  it("boots, keeps the item in the save, does not simulate it and carries it through later saves and a reload", async () => {
+    const UNKNOWN = "houses_015_001_bavarian"; // expired limited edition
+    const SID = "900001";
+    // The bundled XML still lists the expired edition, the served table (what the client gets) does not.
+    expect(defs.has(UNKNOWN)).toBe(true);
+    const served = new Map([...defs].filter(([sku]) => sku !== UNKNOWN));
+    const dbPath = tmpDb();
+
+    // First run: complete the tutorial (tutorial_completed would otherwise reset a save with houses), then inject the item.
+    {
+      const { app, conn } = await startServer(dbPath);
+      await Game.boot({ conn, defs: served, fetchText, skipTutorial: true });
+      const universe = app.getDocument("universe");
+      const children = myCompanyChildren(universe);
+      expect(children).toBeDefined();
+      children!.push({
+        Item: [{ State: [], id: "1", mode: "4", contractSku: "1" }],
+        sid: SID,
+        sku: UNKNOWN,
+        x: "10",
+        y: "10",
+        isSuspended: "0"
+      });
+      // the server caches documents: stop it, then write the file
+      await apps.pop()?.stop();
+      setDocument(dbPath, "universe", universe);
+    }
+
+    // Boot under test: no crash, one warning, the item is not simulated.
+    const { conn, dbWorld } = await startServer(dbPath);
+    const stored = (await dbWorld()).mine!.items.find((i) => i.sid === SID);
+    expect(stored).toMatchObject({ sku: UNKNOWN, stateId: 1 });
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    let game: Game;
+    let warnings: string[];
+    try {
+      game = await Game.boot({ conn, defs: served, fetchText, skipTutorial: true });
+    } finally {
+      warnings = warn.mock.calls.map((call) => String(call[0])); // read before restore, which clears the calls
+      warn.mockRestore();
+    }
+    expect(warnings.filter((w) => w.includes(UNKNOWN))).toHaveLength(1);
+    expect(game.item(SID)).toBeUndefined();
+    expect(game.items().map((i) => i.sid)).not.toContain(SID);
+
+    // No income or simulation: a long tick leaves the money and experience unchanged. The boot's packet is sent first, so
+    // the one-call 3-day tick does not expire the session's no-response timer while it is in flight.
+    await game.flush();
+    const before = game.profile;
+    game.tick(3 * 86_400_000);
+    expect(game.profile.coins).toBe(before.coins);
+    expect(game.profile.exp).toBe(before.exp);
+    expect(game.profile.cash).toBe(before.cash);
+    expect(game.item(SID)).toBeUndefined();
+
+    // A normal action and its save leave the unknown item in the save exactly as it was.
+    const built = game.autoBuild("houses_001_001");
+    expect(built).toBeTruthy();
+    await game.flush();
+    const afterSave = await dbWorld();
+    expect(afterSave.mine!.items.find((i) => i.sid === SID)).toEqual(stored);
+    expect(afterSave.mine!.items.find((i) => i.sid === built!.sid)).toMatchObject({ sku: "houses_001_001" });
+
+    // A reload keeps it too.
+    await apps.pop()?.stop();
+    const again = await startServer(dbPath);
+    const warnAgain = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    let reloaded: Game;
+    try {
+      reloaded = await Game.boot({ conn: again.conn, defs: served, fetchText, skipTutorial: true });
+    } finally {
+      warnAgain.mockRestore();
+    }
+    expect(reloaded!.item(SID)).toBeUndefined();
+    expect((await again.dbWorld()).mine!.items.find((i) => i.sid === SID)).toEqual(stored);
   });
 });

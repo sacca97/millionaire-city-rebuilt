@@ -16,10 +16,10 @@ The first route prioritizes preservation and lower implementation effort. The se
 The repository contains:
 
 - The recovered `assets/dchoc1-a.akamaihd.net/0.501/mcity/Datas/Dollars.swf`, supporting SWFs, images, and XML rules.
-- A TypeScript/Express server in `apps/server`, with command handlers and SQLite persistence.
-- An Electron 10.4.7 desktop launcher with Pepper Flash in `apps/desktop`.
+- A server with command handlers and SQLite persistence: originally TypeScript/Express in `apps/server`, now the Rust server in `apps/server-rs` (the TS server is in git history).
+- (Historical) an Electron 10.4.7 desktop launcher with Pepper Flash; superseded by the Tauri app in `apps/desktop`.
 - Selected ActionScript patches in `client-patch-sources`.
-- A JPEXS preparation script in `apps/server/src/scripts/prepareClient.ts` that produces a modified SWF.
+- A JPEXS preparation script, `tools/prepare-client.mjs` (formerly `apps/server/src/scripts/prepareClient.ts`), that produces a modified SWF.
 - Shared protocol helpers in `packages/shared`. Responses contain XML envelopes with JSON command data; saves also use legacy structures.
 
 These are a working preservation foundation, not a complete original development project. No verified complete newer official source release or client archive was identified during the initial research. Neither option depends on finding one.
@@ -180,16 +180,16 @@ Return findings with repository file references, distinguish verified facts from
 
 Repository review corrected several plan assumptions:
 
-- The "SQLite save" is JSON documents keyed by tag in `save_documents` (`apps/server/src/database.ts`), mirroring XML as string-typed trees with packed and ASCII-encoded fields.
+- The "SQLite save" is JSON documents keyed by tag in `save_documents` (`apps/server-rs/src/database.rs`, formerly `apps/server/src/database.ts`), mirroring XML as string-typed trees with packed and ASCII-encoded fields.
 - The server records client-reported state. It has no placement/footprint validation, and income math is probably computed in the Flash client. Neighbors are hardcoded NPCs, and login is unauthenticated.
-- `prepareClient.ts` needs Java and FFDec 26.0.0.
+- `tools/prepare-client.mjs` needs Java and FFDec 26.0.0.
 - Likely Ruffle blockers: `MouseWheelEnabler.as` JS injection via `ExternalInterface.call`, the `Server.as` ExternalInterface callbacks, `Security.allowInsecureDomain("*")`, and the self-signed HTTPS crossdomain flow. All untested.
-- Tests are a single integration file (`apps/server/test/server.test.ts`).
+- Tests were a single integration file (`apps/server/test/server.test.ts`, now ported to `tools/conformance`).
 
 If the goal is to leave Flash, Ruffle is only a bridge. The route is a client rewrite (Option B) with these changes:
 
 1. **Decompile first (L0).** Decompile `Dollars.swf` with FFDec and write a spec of the baseline loop (tile transform, draw order, placement, contracts, rent, save fields). Output stays under gitignored `decompiled/`.
-2. **Asset pipeline (L1).** A script exports item SWFs to sprites plus a JSON file of anchors/offsets/frames, run locally. Original assets are not redistributable (`NOTICE.md`).
+2. **Asset pipeline (L1).** A script exports item SWFs to sprites plus a JSON file of anchors/offsets/frames, run locally. No licence is known for the original assets (`NOTICE.md`).
 3. **Shared rules (L2).** Put placement and income rules in a shared module used by client and server, verified against the Flash build.
 4. **Golden-save diffs.** Compare save documents before/after each baseline action between the legacy client and the new one. The Flash build stays as the oracle.
 5. **Engine decision deferred until after L0/L1.** Leaning TypeScript (shares `packages/shared` and the rules module); Godot if native export and mobile matter more.
@@ -203,3 +203,7 @@ If the goal is to leave Flash, Ruffle is only a bridge. The route is a client re
 - Local ownership notice: `NOTICE.md`. The revival's MIT license does not cover original game assets or third-party runtime files. This plan does not establish permission to redistribute those materials.
 
 Compatibility and extraction remain hypotheses until the proposed prototypes are exercised. No new prototype or implementation validation has been performed for this planning document.
+
+## Status: desktop packaging moved to Tauri
+
+The shipped desktop app no longer contains Flash. `apps/desktop` is a Tauri 2 app (system web view) with the Rust server (`mcity-server` as a library) embedded on a free 127.0.0.1 port; saves stay at the old Electron path (`<config dir>/millionaire-city-app/data/mcity.sqlite`). The original Flash client (Electron 10 + Pepper Flash) survives only in `tools/oracle` for parity checks, with its own pinned `package.json`. See `apps/desktop/README.md`.

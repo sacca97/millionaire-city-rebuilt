@@ -5,10 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { rustServerSpecs } from "./serverCmd.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(here, "../..");
-const require = createRequire(path.join(root, "apps/server/package.json"));
+const require = createRequire(path.join(root, "tools/conformance/package.json"));
 const Database = require("better-sqlite3");
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -35,10 +36,7 @@ export async function createOracle(name, { width = 1280, height = 800, seed } = 
   };
   const o = { outDir, dbPath, ports: P, width, height, stopAll, n: 0 };
 
-  spawnGrp("npx", ["tsx", "src/main.ts"], {
-    cwd: path.join(root, "apps/server"),
-    env: { ...process.env, MCITY_CMDLOG: process.env.MCITY_CMDLOG ?? path.join(outDir, "cmds.jsonl"), NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --require ${path.join(here, "cmdlog.cjs")}`, MCITY_DB_PATH: dbPath, MCITY_HTTP_PORT: P.http, MCITY_HTTPS_PORT: P.https, MCITY_FACEBOOK_PORT: P.fb },
-  }, "server.log");
+  for (const s of rustServerSpecs({ pubBase: PB, dbPath, cmdlog: process.env.MCITY_CMDLOG ?? path.join(outDir, "cmds.jsonl"), tmp })) spawnGrp(s.cmd, s.args, s.opts, s.log);
   for (let i = 0; ; i++) {
     try { if ((await fetch(`http://127.0.0.1:${P.http}/health`)).ok) break; } catch {}
     if (i > 60) throw new Error("server did not start; see out/" + name + "/server.log");
@@ -59,7 +57,7 @@ export async function createOracle(name, { width = 1280, height = 800, seed } = 
   };
   if (seed) o.seedDb(seed);
   o.launch = ({ query = "" } = {}) => {
-    spawnGrp("xvfb-run", ["-a", "-s", `-screen 0 ${width}x${height}x24`, path.join(root, "node_modules/electron/dist/electron"), path.join(here, "loader.cjs")], {
+    spawnGrp("xvfb-run", ["-a", "-s", `-screen 0 ${width}x${height}x24`, path.join(here, "node_modules/electron/dist/electron"), path.join(here, "loader.cjs")], {
       cwd: root,
       env: { ...process.env, ORACLE_URL: `https://127.0.0.1:${P.https}/launcher${query}`, ORACLE_CTL_PORT: P.ctl, ORACLE_FB_PORT: P.fb, ORACLE_W: width, ORACLE_H: height },
     }, "electron.log");

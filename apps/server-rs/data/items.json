@@ -1,0 +1,29 @@
+{
+  "createHeadQuarterDecorations": {
+    "Decorations": [
+      {
+        "Decoration": [
+          {
+            "sku": [],
+            "id": "HeadQuarter_01"
+          },
+          {
+            "sku": [],
+            "id": "HeadQuarter_02"
+          },
+          {
+            "sku": [],
+            "id": "HeadQuarter_03"
+          },
+          {
+            "sku": [],
+            "id": "HeadQuarter_04"
+          }
+        ],
+        "type": "0",
+        "currentSku": "HeadQuarter_01",
+        "shadowRows": "0"
+      }
+    ]
+  }
+}

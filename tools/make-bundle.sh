@@ -3,8 +3,8 @@
 # Usage: tools/make-bundle.sh [output.zip] [--with-opt]
 #   --small     ship the optimised assets (public-opt, ~270 MB) AS apps/client/public instead of the originals (~540 MB): about half the size
 #   --with-opt  also include apps/client/public-opt next to the originals
-# Excluded: node_modules, git data, generated/, decompiled/, tmp/, archive-*, the original zip, build output, oracle output,
-# databases, the Flash runtime binaries of apps/desktop (not needed to run the rewrite).
+# Excluded: node_modules, Rust target dirs, git data, generated/, decompiled/, tmp/, archive-*, the original zip, build output, oracle output,
+# databases, the Flash runtime binaries of tools/oracle/flash (not needed to run the rewrite).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="mcity-rewrite-bundle.zip"
@@ -22,12 +22,12 @@ rm -f "$OUT_ABS"
 
 PATHS=(
   build.sh run.sh package.json package-lock.json tsconfig.base.json LICENSE NOTICE.md README.md
-  scripts packages apps/server apps/client assets docs tools
-  apps/desktop/package.json apps/desktop/tsconfig.json apps/desktop/src
+  scripts packages apps/server-rs apps/client assets docs tools
+  apps/desktop/package.json apps/desktop/package-lock.json apps/desktop/scripts apps/desktop/ui apps/desktop/assets apps/desktop/src-tauri
 )
 EXCLUDES=(
   '*/node_modules/*' '*/dist/*' '*.sqlite' '*.sqlite-shm' '*.sqlite-wal' '*.tsbuildinfo'
-  'tools/oracle/out/*' 'apps/client/public-bak/*' '*/__pycache__/*' '*.pyc'
+  'apps/server-rs/target*/*' 'apps/desktop/src-tauri/target/*' 'tools/oracle/flash/*' 'tools/oracle/out/*' 'apps/client/public-bak/*' '*/__pycache__/*' '*.pyc'
 )
 [ "$WITH_OPT" = 1 ] || EXCLUDES+=('apps/client/public-opt/*')
 
@@ -49,7 +49,7 @@ fi
 echo "bundle: $OUT_ABS ($(du -h "$OUT_ABS" | cut -f1))"
 cat <<'MSG'
 
-On the other machine (Node 20+ or 22):
+On the other machine (Node 20+ or 22 and a Rust toolchain, https://rustup.rs):
   unzip mcity-rewrite-bundle.zip -d millionaire-city-rebuilt && cd millionaire-city-rebuilt
   ./build.sh
   ./run.sh

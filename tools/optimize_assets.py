@@ -4,7 +4,7 @@
   * sprites: prune clips the client can never request (see KEEP_CLIP), de-duplicate identical frames
     (pixel-identical decoded RGBA -> one file, index.json points several frames at it), convert to lossless WebP.
   * _building_state, gui, ground/background: lossless WebP (gui/ground keep requesting `.png` URLs; the
-    server and the vite dev server answer `X.png` from `X.webp`, see apps/server/src/clientStatic.ts).
+    server and the vite dev server answer `X.png` from `X.webp`, see apps/server-rs/src/client_static.rs).
   * json minified, audio/fonts copied.
 Every conversion is verified: the WebP is decoded and compared with the source PNG (RGBA incl. transparent
 pixels) and the script aborts on any difference.

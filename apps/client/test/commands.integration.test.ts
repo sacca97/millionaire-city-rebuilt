@@ -8,10 +8,9 @@ import { GameCommands, type ProfileSnapshot } from "../src/net/commands";
 import { GameConnection } from "../src/net/protocol";
 import { CommandQueue } from "../src/net/session";
 import { parseWorld, type WorldState } from "../src/model/save";
-import { createServerApp } from "../../server/src/serverApp";
-import { getServerConfig } from "../../server/src/config";
+import { setDocument, startTestServer, type TestServer } from "./rustServer";
 
-const apps: Array<ReturnType<typeof createServerApp>> = [];
+const apps: TestServer[] = [];
 afterEach(async () => {
   while (apps.length > 0) {
     await apps.pop()?.stop();
@@ -19,11 +18,9 @@ afterEach(async () => {
 });
 
 async function boot(dbPath: string) {
-  const config = { ...getServerConfig(), dbPath, useHttpsFacebookShim: false, httpPort: 0, httpsPort: 0 };
-  const app = createServerApp(config);
+  const app = await startTestServer(dbPath);
   apps.push(app);
-  await app.start();
-  const conn = new GameConnection({ baseUrl: `http://127.0.0.1:${config.httpPort}`, uid: config.launcherUserId });
+  const conn = new GameConnection({ baseUrl: app.baseUrl, uid: app.uid });
   await conn.login();
   const world = async (): Promise<WorldState> => parseWorld((await conn.query("get_world", { targetUserId: 1 }))!._dat);
   return { app, conn, world };
@@ -137,7 +134,7 @@ describe("command layer against the real server", () => {
     expect(w.profile.cityName).toBe("Newtown");
     expect(w.profile.raw.bossGenre).toBe("1");
 
-    const universe = JSON.stringify(app.repository.getDocument(1, "universe"));
+    const universe = JSON.stringify(app.getDocument("universe"));
     expect(universe).toContain("BUILDhouses/1");
     expect(universe).toContain("LEVEL/7");
 

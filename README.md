@@ -1,6 +1,6 @@
 # Millionaire City Rebuilt
 
-Millionaire City Rebuilt is a fan-made local revival of the `0.501` Millionaire City Flash client. It runs the original client with a replacement local server, bundled Flash-capable Electron runtime, and local SQLite save storage. The revival is built with TypeScript, Node.js, Express, Electron, and `better-sqlite3`.
+Millionaire City Rebuilt is a fan-made local revival of the `0.501` Millionaire City Flash client. It is a TypeScript (Pixi.js) web client, a Rust game server with local SQLite saves, and a Tauri desktop app that bundles both. The original Flash game is not shipped; it is used only as a parity oracle (`tools/oracle`).
 
 This project is not affiliated with Digital Chocolate, Ubisoft, or Facebook.
 
@@ -47,7 +47,7 @@ For running the desktop client in development, run:
 npm run dev:desktop
 ```
 
-For running only the local server in development, run:
+For running only the local server in development (needs a Rust toolchain), run:
 
 ```powershell
 npm run dev:server
@@ -55,23 +55,16 @@ npm run dev:server
 
 ## Browser Play
 
-The portable release is designed to use the bundled Electron client. Do not run the portable app and another browser client at the same time, because both would use the same local save.
-
-Users building from source can use their own Flash-capable browser by starting only the local server, then opening:
-
-```text
-https://127.0.0.1:31804/launcher
-```
-
-The bundled Electron runtime is the recommended way to play.
+`make run` serves the client at `http://127.0.0.1:31803/` (saves in `~/mcity.sqlite`). Do not run it against the same save as the desktop app at the same time.
 
 ## Project Layout
 
-- `apps/server`: local HTTP game server, HTTPS Facebook shim, SQLite persistence, and launcher page
-- `apps/desktop`: Electron launcher that starts the server and opens the bundled Flash runtime
+- `apps/server-rs`: local game server in Rust (HTTP, HTTPS Facebook shim, SQLite persistence, launcher page, offline NPC friends); build with `make server`
+- `tools/conformance`: black-box conformance suite for the server binary (`make conformance`)
+- `apps/desktop`: Tauri 2 desktop app (system web view, game server embedded in-process); `src-tauri/` is the Rust shell
 - `packages/shared`: protocol constants, types, and envelope helpers shared by both apps
 - `assets`: recovered game cache served by the local server
-- `apps/desktop/assets/flash`: bundled Pepper Flash runtime binaries
+- `tools/oracle`: parity harness around the ORIGINAL Flash client (its own Electron 10 + Pepper Flash in `tools/oracle/flash`; never shipped)
 - `generated`: generated private SWF copy, SQLite save data, downloaded tools, release runtime files, and local backups
 
 ## Game art
@@ -82,6 +75,5 @@ and stay out of git. Art is derived from the original game's assets; see NOTICE.
 
 ## Desktop app
 
-`npm ci && npm run dev:desktop` starts the game in an Electron window; `npm run package:mac` (or `:win`, `:linux`) builds a zip.
-Details and requirements (Node >= 22.12, native Node on Apple Silicon): `tools/app/README.md`. The Flash-era launcher in `apps/desktop`
-is no longer part of the npm workspaces.
+`make app-dev` (or `npm run dev:desktop`) runs the Tauri app from the repository; `make app` (or `npm run package`) builds the installer for this OS.
+Details, save locations and CI: `apps/desktop/README.md`.
