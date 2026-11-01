@@ -127,6 +127,7 @@ export async function showMessage(text: string, icon: 'terrain' | 'lock' | null 
   // mPopupMsgSmall = PopupMessageSmall (popup_missage), the big variant is popup_confirm_buy_manager.
   const w = await Widget.create('houses_info', small ? 'popup_missage' : 'popup_confirm_buy_manager');
   const p = new Popup(w);
+  p.clearsShowFlag = true;
   w.find('plots_info')?.setVisible(icon === 'terrain');
   w.find('locked')?.setVisible(icon === 'lock');
   w.setText('TextInfo_01', text, { rich: false });

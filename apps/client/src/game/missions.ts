@@ -501,6 +501,11 @@ export interface MissionManagerEvents {
 
 type Listener<T> = (payload: T) => void;
 
+/** MissionObjectManager.sortMissionsBySku: ActionScript string comparison (UTF-16 code units, like JS `<`). */
+export function compareSkuStrings(a: MissionObject, b: MissionObject): number {
+  return a.def.sku > b.def.sku ? 1 : a.def.sku < b.def.sku ? -1 : 0;
+}
+
 export class MissionManager {
   readonly poll: PollManager;
   private readonly defs: MissionDef[];
@@ -512,6 +517,8 @@ export class MissionManager {
   initialized = false;
   /** Set by the UI while a PopupReward is open (mRewardPopup != null). */
   rewardPopupOpen = false;
+  /** A mission PopupReward is being built (mShowPopup is already set, PopupReward.as constructor -> show) but is not on the popup stack yet. */
+  rewardPopupBuilding = false;
   private notifyEnabled = false;
   private delayed: RewardGain = { coins: 0, exp: 0, cash: 0 };
   private readonly listeners = new Map<string, Set<Listener<never>>>();
@@ -577,9 +584,10 @@ export class MissionManager {
       this.byList[listPosition(obj.state)].push(obj);
       this.addToDictionary(obj);
     }
-    // sortMissionsBySku compares the sku STRINGS (:318-330) ("1","10","2","5"), but the oracle's missions panel (hud-tour 05) lists the same
-    // save as 1,2,5,10: numeric order.
-    this.byList[LIST_UP].sort((a, b) => Number(a.def.sku) - Number(b.def.sku) || (a.def.sku > b.def.sku ? 1 : a.def.sku < b.def.sku ? -1 : 0));
+    // sortMissionsBySku (MissionObjectManager.as:175-189, called at :728) compares the sku STRINGS ("1","10","2","5"). The oracle's
+    // fresh-profile panel (hud-tour 05: Name It, Pizzalicious, Instant Build, Green Thumb I = skus 1,2,5,10) is numeric only because
+    // those missions entered Up through the LOCKED -> UNLOCKED path (definition order), not through build().
+    this.byList[LIST_UP].sort(compareSkuStrings);
     this.notifyEnabled = true;
     this.resolveBeatConditions();
     this.poll.build(save.pollCounts);
@@ -707,7 +715,7 @@ export class MissionManager {
     return "none";
   }
 
-  /** sortMissionsLocked (:75-117), including the original's fall-through structure. */
+  /** sortMissionsLocked (MissionObjectManager.as:101-141), including the original's fall-through structure. */
   private compareLocked(a: MissionObject, b: MissionObject): number {
     const da = a.def;
     const db = b.def;
@@ -718,8 +726,9 @@ export class MissionManager {
     if (sa && !sb) r = -1;
     if (sb && !sa) r = 1;
     else if (sa && sb) {
-      const ua = Number(da.unlockSku);
-      const ub = Number(db.unlockSku);
+      // sortMissionsLocked :109-113: MissionDefinition.unlockSku is a String, compared directly ("10" < "2"), not as a number.
+      const ua = da.unlockSku;
+      const ub = db.unlockSku;
       r = ua > ub ? 1 : ua < ub ? -1 : bySku();
     } else if (da.unlockLevel > db.unlockLevel) r = 1;
     else if (db.unlockLevel > da.unlockLevel) r = -1;

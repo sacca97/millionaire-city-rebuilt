@@ -1,5 +1,18 @@
 // Pure rules of the visitor upgrade mechanic (social.xml + UpgradesManager/StateOnRentVisitor).
-export const UPGRADE_REWARD = { coins: 100, exp: 10 }; // social.xml upgradesVisitorDCCoinsPerUpgrade / ExpPerUpgrade
+export const UPGRADE_REWARD = { coins: 100, exp: 10 }; // social.xml upgradesVisitorDCCoinsPerUpgrade / ExpPerUpgrade (UPGRADE_TYPE_NORMAL)
+export const SUPER_UPGRADE_REWARD = { coins: 150, exp: 15 }; // social.xml superUpgradesVisitorDCCoinsPerUpgrade / ExpPerUpgrade (UPGRADE_TYPE_SUPER)
+export const UPGRADE_TYPE_NORMAL = 0;
+export const UPGRADE_TYPE_SUPER = 1;
+
+/** UpgradesManager.setNeighborId (:276-293): SUPER when the visited neighbour is a partner. Every NPC is a partner (FriendObject.as:94,121). */
+export function upgradeTypeFor(userId: string): number {
+  return userId === '100' || userId === '101' ? UPGRADE_TYPE_SUPER : UPGRADE_TYPE_NORMAL;
+}
+
+/** UpgradesManager.getDCCoinsPerUpgrade / getExpPerUpgrade (:95-98, RulesFacade.as:527,686) by type. */
+export function upgradeRewardFor(type: number): { coins: number; exp: number } {
+  return type === UPGRADE_TYPE_SUPER ? SUPER_UPGRADE_REWARD : UPGRADE_REWARD;
+}
 export const OWNER_EXTRA_PERCENT = 10; // upgradesOwnerExtraPercentage
 export const MAX_UPGRADES_PER_VISIT = 5; // upgrade_maximunOf_items
 

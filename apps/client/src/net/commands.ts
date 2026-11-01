@@ -2,8 +2,8 @@
 //
 // Citations are relative to decompiled/scripts/com/dchoc/dollars/ (gitignored reference):
 //   UDFO = model/userdata/UserDataFacadeOnline.as   UDF = model/userdata/UserDataFacade.as
-// "Server:" lines name the handler in apps/server/src/commandHandlers.ts (CommandService) that consumes the command.
-// "MISMATCH:" lines flag fields the server ignores / mis-handles (apps/server is intentionally not edited).
+// "Server:" lines name the handler in the former TS server (apps/server/src/commandHandlers.ts, in git history; now apps/server-rs/src/commands/) that consumes the command.
+// "MISMATCH:" lines flag fields the server ignores / mis-handles (the server was intentionally not edited).
 //
 // Builders return PacketCommand without `_cnt`; CommandQueue (session.ts) stamps `_cnt` (Server.sendCommand, Server.as:306).
 // Preconditions the original enforced before calling the facade (caller's responsibility here):
@@ -625,7 +625,7 @@ export class GameCommands {
    * Server: handleUpgradeCommand records one visitor upgrade per (owner,sid,visitor,day), max VISITOR_UPGRADES_PER_DAY.
    * RESOLVED: positive visitor deltas of the snapshot are applied.
    */
-  addUpgradeItem(p: { ownerId: string; visitorId: string; sid: string; type: string | number }): PacketCommand {
+  addUpgradeItem(p: { ownerId: string | number; visitorId: string | number; sid: string; type: string | number }): PacketCommand {
     return cmd("add_upgrade_item", { ...p, security: this.security.update() });
   }
 

@@ -1,6 +1,6 @@
 // Expansion plots: 25 plots composed of "mini" areas on a 6x6 grid of 15x10-tile areas.
 // Sources: rules/expansions.xml (Composition), Map.getAreaIndexFromTileIndex (Map.as:1850),
-// Profile.isExpansionAreaType (Profile.as:1475), apps/server/src/commandHandlers/plots.ts.
+// Profile.isExpansionAreaType (Profile.as:1475), apps/server-rs/src/commands/plots.rs.
 
 export const AREA_COLS = 15;
 export const AREA_ROWS = 10;

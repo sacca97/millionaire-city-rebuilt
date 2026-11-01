@@ -1,5 +1,5 @@
 // Parses the legacy "XML-as-JSON" save documents (get_world) into typed state.
-// Document shape: {tagName: [children...], attr: "string"}; see apps/server/src/saveDefaults.
+// Document shape: {tagName: [children...], attr: "string"}; see apps/server-rs/data/ (save defaults).
 
 type Node = Record<string, unknown>;
 
@@ -84,12 +84,16 @@ export function parseChunk(chunk: string | undefined): Array<[number, number]> {
   return out;
 }
 
+const XML_ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'" };
+/** The server sends attribute text XML-escaped (the original client's XML parser decodes it): "Sheik&apos;s City" shows as "Sheik's City". */
+const decodeXmlText = (s: string): string => s.replace(/&(?:amp|lt|gt|quot|apos);/g, (e) => XML_ENTITIES[e] ?? e);
+
 export function parseWorld(getWorldDat: Node): WorldState {
   const universe = ((getWorldDat.universe as Node[] | undefined) ?? []).map(toEl);
   const profileEl = universe.find((e) => e.tag === "Profile");
   const raw = profileEl?.attrs ?? {};
   const profile: Profile = {
-    cityName: raw.cityname ?? "My City",
+    cityName: decodeXmlText(raw.cityname ?? "My City"),
     userName: raw.userName ?? "Mayor",
     exp: Number(raw.exp ?? 0),
     coins: Number(raw.DCCoins ?? 0),

@@ -32,9 +32,12 @@ const BOX_W = 74;
 const FRIENDS_PER_PAGE = 8; // FriendsBar.as:25
 const VISIBLE_W = 619;
 
-/** Pure: rank by company value (desc); the position badge of each neighbor. */
+/**
+ * Pure: sort ascending by company value, as FriendsManager.sortCompareFunctionCompanyValue (:533-547) does (it returns 0 on ties, so
+ * ties keep their input order). The caller ranks the result as length - index (FriendsBar.buildNeighborsContent :136-170).
+ */
 export function rankNeighbors(list: Neighbor[]): Neighbor[] {
-  return [...list].sort((a, b) => b.companyValue - a.companyValue);
+  return [...list].sort((a, b) => (a.companyValue > b.companyValue ? 1 : a.companyValue < b.companyValue ? -1 : 0));
 }
 
 export function parseNpcs(xml: string, bossGenre: number): Neighbor[] {
@@ -174,8 +177,7 @@ export class FriendsBar {
     try {
       // FriendsBar.buildNeighborsContent :136-170: FRIENDS_PER_PAGE (8) minus the neighbor count of "Add neighbors" slots first, then the
       // neighbors sorted ascending by company value (rank = count - index), so the best company sits at the right end.
-      const ranked = rankNeighbors([this.selfEntry(), ...this.neighbors]); // descending: rank = index + 1
-      const asc = [...ranked].reverse();
+      const asc = rankNeighbors([this.selfEntry(), ...this.neighbors]);
       const empties = Math.max(0, FRIENDS_PER_PAGE - asc.length);
       const row = document.createElement("div");
       row.style.cssText = "position:absolute;left:0;top:0;transition:transform .2s";

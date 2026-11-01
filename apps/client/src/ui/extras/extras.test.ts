@@ -7,7 +7,7 @@ import { GIVE_BACK_TEXTS, GIVE_BACK_UNLOCK_COMPANY_VALUE } from './charity.confi
 import { getText, overrideTexts, setLocale, tidIndex } from '../../gui/i18n';
 import { coverTimeline } from './journal';
 import { newsFeedDescTid, newsFeedReward, parseNewsFeeds, parseRewardClickSounds, presentable } from './newsfeed';
-import { isAnimatedPlane, parsePlaneRewards, planeGone, planeX, plainClassFor } from './plane';
+import { isAnimatedPlane, isPlaneFlying, parsePlaneRewards, planeGone, planeX, plainClassFor } from './plane';
 import { logoutTid } from './connection';
 import { parseWelcome, planWelcome } from './welcome';
 import { definitions } from './xml';
@@ -60,6 +60,10 @@ describe('plane', () => {
     expect(plainClassFor('plane_03')).toBe('plane_03');
     expect(plainClassFor('bogus')).toBe('plain');
   });
+  it('no plane is active until one starts (Plane.isActive gate of PopupCollectibleManager.claimReward)', () => {
+    expect(isPlaneFlying()).toBe(false);
+  });
+
   it('plane rewards by group', () => {
     const m = parsePlaneRewards('<D><Definition sku="2" reward="plane_02" rewardType="plane"/><Definition sku="3" reward="x" rewardType="item"/></D>');
     expect([...m]).toEqual([['2', 'plane_02']]);

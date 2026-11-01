@@ -1,5 +1,5 @@
 // Wire protocol of the local server: POST /Game (form body), XML envelope with CDATA JSON.
-// Server side: apps/server/src/serverApp.ts (/Game handler), packages/shared/src/protocol.ts.
+// Server side: apps/server-rs/src/server_app.rs (/Game handler), packages/shared/src/protocol.ts.
 
 import { signParams } from "./md5";
 

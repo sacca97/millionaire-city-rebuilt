@@ -60,9 +60,11 @@ export class MissionSystem {
   private visiting = false;
   /**
    * The level the mission unlock checks see (UnlockMissionByLevel reads Profile.level). The original raises Profile.level one step at a
-   * time from Profile.checkLevelUpShow, which DollarsGame.logicUpdate only runs while no popup is open (mShowPopup) and which opens a
+   * time from Profile.checkLevelUpShow, which DollarsGame.logicUpdate only runs while DollarsGame.mShowPopup is false and which opens a
    * PopupLevel per step: while the claim's reward popup is open the level-gated missions (oracle R04-65: 11/43/55/67/87) stay locked
-   * until the popups are closed.
+   * until the popups are closed. mShowPopup is a flag, not a count: closing a PopupMessage clears it even while the reward popup is still
+   * open (PopupMessage.as:88), so the level steps (and the earn chain, oracle R02-3-g1) go on right after the "ask for help" info closes
+   * (`popups.showPopupFlag`).
    */
   private missionLevel: number;
   private updating = false;
@@ -168,7 +170,7 @@ export class MissionSystem {
     try {
       do {
         this.updatePending = false;
-        if (this.missionLevel < this.game.profile.level && !popups.isAnyOpen && !this.manager.rewardPopupOpen) this.missionLevel += 1;
+        if (this.missionLevel < this.game.profile.level && !popups.showPopupFlag && !this.manager.rewardPopupBuilding) this.missionLevel += 1;
         this.manager.update();
         this.pushAlert();
       } while (this.updatePending && !this.visiting);
@@ -193,7 +195,7 @@ export class MissionSystem {
   private wire(): void {
     const { game, manager } = this;
     // ItemObject.registerEvent fan-out / StateOnRent.giveIncome / plain PollManager.registerEvent.
-    game.on("poll", ({ type, sku, extra }) => {
+    game.on("poll", ({ type, sku, extra, upgraded }) => {
       if (sku === undefined) {
         manager.register(type);
       } else {
@@ -201,6 +203,8 @@ export class MissionSystem {
         const nameType = nameTypeOf(d?.rules.kind ?? "other", sku);
         if (type === MISSION_EVENT.collect) {
           if (extra !== undefined) manager.register(type, `${nameType}%${extra}`);
+          // StateOnRent.giveIncome (:1478-1481): an upgraded house also registers collectUpgraded <nameType>, before collect <nameType>.
+          if (upgraded) manager.register(MISSION_EVENT.collectUpgraded, nameType);
           manager.register(type, nameType);
           manager.register(type, sku);
         } else {
@@ -231,10 +235,13 @@ export class MissionSystem {
       this.update();
     }, 1000);
     uiBus.on("visitStarted", ({ userId }) => {
-      // DollarsGame.as:1612-1626 (visitor role after the world loaded): visitRonald/visitFriend + visitCity.
+      // DollarsGame.as:1612-1626 (visitor role after the world loaded): visitRonald (owner == mNPCSArray[0], user 100) or visitFriend,
+      // visitPartner when the neighbor is a partner and always visitCity. Every NPC is a partner (NeighborObject.isPartner = isAdvisor(),
+      // FriendObject.as:121), so a visit of Cindy/Ronald (100) or Sheik (101) counts for the visitPartner missions.
       this.visiting = true;
-      const npc = userId === "100" || userId === "101";
-      manager.register(npc ? MISSION_EVENT.visitRonald : MISSION_EVENT.visitFriend);
+      const advisor = userId === "100";
+      manager.register(advisor ? MISSION_EVENT.visitRonald : MISSION_EVENT.visitFriend);
+      if (userId === "100" || userId === "101") manager.register(MISSION_EVENT.visitPartner);
       manager.register(MISSION_EVENT.visitCity);
     });
     uiBus.on("visitEnded", () => {

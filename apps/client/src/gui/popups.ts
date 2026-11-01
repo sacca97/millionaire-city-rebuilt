@@ -59,6 +59,49 @@ export async function createTradeBox(o: { price: number; instantBuild?: boolean;
   return p;
 }
 
+/**
+ * houses_info.swf Popup_wonders (PopupInstantBuild.as): item name + help text, a strip of NUM_ITEMS friend slots (popup_wonders_friend_x
+ * silhouettes; loadFriends :167-212), "Ask for help" and the paying button ("instant_build" cash / "instant_build_fbc" / none, :84-101).
+ * `helpers` = FriendsManager.getBuildingHelp(sid) ids (none offline). Closing via X or "Ask for help" closes; paying accepts.
+ */
+export async function createInstantBuildHelp(o: {
+  name: string;
+  text: string;
+  button: 'none' | 'fbc' | 'cash';
+  fbc: number;
+  helpers?: string[];
+  slots?: number;
+  onAskHelp?: () => void;
+  onPay?: () => void;
+}): Promise<Popup> {
+  const w = await Widget.create('houses_info', 'Popup_wonders');
+  const p = new Popup(w);
+  w.setText('wonder', o.name);
+  w.setText('TextInfo', o.text);
+  w.hide('TextInfo_2');
+  p.wireClose(new Button(w.part('mClose')));
+  const btn = (n: string, label: string) => { const b = new Button(w.part(n)); b.setLabel(label); return b; };
+  const pay = btn('instant_build', getText('TID_TUTORIAL_TITLE_6'));
+  const payFbc = btn('instant_build_fbc', convertNumberToString(o.fbc, TRUNCATE_MILLIONS, 6));
+  w.show('instant_build', o.button === 'cash');
+  w.show('instant_build_fbc', o.button === 'fbc');
+  pay.onClick(() => { o.onPay?.(); p.accept(); });
+  payFbc.onClick(() => { o.onPay?.(); p.accept(); });
+  const help = btn('ask_for_help', getText('TID_BUTTON_ASK_HELP'));
+  help.onClick(() => { p.close(); o.onAskHelp?.(); });
+  // Friend strip: XINIT/YINIT/XOFFSET of PopupInstantBuild; photos are not available offline, every slot is a silhouette.
+  const n = Math.max(o.slots ?? 5, o.helpers?.length ?? 0);
+  for (let i = 0; i < n; i++) {
+    const sil = await Widget.create('houses_info', 'popup_wonders_friend_x');
+    sil.root.style.transform = `translate(${-147.5 + 60 * i}px,${-10.1}px)`;
+    if (i < 5) w.root.appendChild(sil.root);
+  }
+  const arrows = [new Button(w.part('mArrowLeft')), new Button(w.part('mArrowRight'))];
+  if (n <= 5) for (const a of arrows) a.disable();
+  else arrows[0].disable();
+  return p;
+}
+
 /** popup_instant_build.swf (PopupInstantBuildSecondStep.as): cash button (button_1) + Facebook-credit button (button_2). */
 export async function createInstantBuild(o: { price: number; fbc: number; canAffordCash: boolean; onCash?: () => void; onFbc?: () => void }): Promise<Popup> {
   const w = await Widget.create('popup_instant_build', 'popup_instant_build');

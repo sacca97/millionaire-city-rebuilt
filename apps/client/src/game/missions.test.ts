@@ -111,6 +111,27 @@ describe("definitions", () => {
 describe("MissionManager state machine", () => {
   const defs = activeDefinitions(ALL, false);
 
+  it("locked previews sort by unlockSku as strings (\"10\" < \"2\"), sortMissionsLocked :109-113", () => {
+    const { host } = makeHost({ v: 1 });
+    const base = ALL.find((d) => d.sku === "18")!;
+    const viaTen = { ...base, sku: "LOCK_A", unlockSku: "10", unlockLevel: -1 };
+    const viaTwo = { ...base, sku: "LOCK_B", unlockSku: "2", unlockLevel: -1 };
+    const m = new MissionManager(host, [...defs, viaTwo, viaTen]);
+    m.build({ ...EMPTY, up: ["2", "10"] });
+    const a = m.getMissionBySku("LOCK_A")!;
+    const b = m.getMissionBySku("LOCK_B")!;
+    // compareLocked is private: called directly so the order is checked without depending on the 6-row preview cut-off.
+    expect(m["compareLocked"](a, b)).toBe(-1);
+    expect(m["compareLocked"](b, a)).toBe(1);
+  });
+
+  it("build() sorts the persisted Up list by sku STRING (sortMissionsBySku :175-189, \"10\" before \"2\")", () => {
+    const { host } = makeHost({ v: 1 });
+    const m = new MissionManager(host, defs);
+    m.build({ ...EMPTY, up: ["5", "10", "2", "1", "64"] });
+    expect(m.getMissionsAvailable().map((o) => o.def.sku)).toEqual(["1", "10", "2", "5", "64"]);
+  });
+
   it("loading from persistence sends nothing and keeps states", () => {
     const { host, log } = makeHost({ v: 1 });
     const m = new MissionManager(host, defs);

@@ -49,12 +49,20 @@ describe("toolbar / info / actions logic", () => {
 });
 
 describe("friends bar data", () => {
-  it("ranks by company value", () => {
+  it("sorts ascending by company value", () => {
     const r = rankNeighbors([
       { userId: "1", name: "a", exp: 0, companyValue: 5 },
       { userId: "2", name: "b", exp: 0, companyValue: 9 },
     ]);
-    expect(r.map((n) => n.userId)).toEqual(["2", "1"]);
+    expect(r.map((n) => n.userId)).toEqual(["1", "2"]);
+  });
+  it("ties keep input order (sortCompareFunctionCompanyValue returns 0), no reversal", () => {
+    const r = rankNeighbors([
+      { userId: "x", name: "x", exp: 0, companyValue: 100 },
+      { userId: "y", name: "y", exp: 0, companyValue: 1 },
+      { userId: "z", name: "z", exp: 0, companyValue: 100 },
+    ]);
+    expect(r.map((n) => n.userId)).toEqual(["y", "x", "z"]);
   });
   it("parses the neighbor list", () => {
     expect(parseNeighborList({ neighborList: [{ id: 7, xp: 10, companyValue: 99 }] })).toEqual([{ userId: "7", name: "Neighbor", exp: 10, companyValue: 99, photo: undefined }]);

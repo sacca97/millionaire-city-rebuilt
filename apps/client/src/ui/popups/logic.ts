@@ -40,3 +40,31 @@ export function contractSlot(index: number): { page: number; x: number; y: numbe
   const row = Math.floor(index / 3) % 2;
   return { page: Math.floor(index / 6), x: 114 * col - 114, y: -80 + 147 * row };
 }
+
+/** social.xml askForHelp_accelerateItem_percent (RulesFacade.askForHelpAccelerateItemPercent): each helping friend cuts the build time by this %. */
+export const ASK_HELP_ACCELERATE_PERCENT = 10;
+/** PopupInstantBuild.NUM_ITEMS: friend slots visible in the strip. */
+export const HELP_STRIP_SLOTS = 5;
+
+/** ItemDefinition.getInstantBuildType values (ItemDefinition.as:114-120). */
+export type InstantBuildButton = 'none' | 'fbc' | 'cash';
+
+/**
+ * StateOnConstructionOwner.doDoClick (:288-300): only "CASH" (and unknown types) skip the wonders popup. Returns whether PopupInstantBuild opens.
+ */
+export function opensHelpPopup(instantBuildType: string): boolean {
+  return instantBuildType === 'A4H' || instantBuildType === 'FBC:A4H' || instantBuildType === 'CASH:FBC:A4H';
+}
+
+/** PopupInstantBuild.showPopupParams (:84-101): which paying button the popup shows next to "Ask for help". */
+export function instantBuildButton(instantBuildType: string): InstantBuildButton {
+  if (instantBuildType === 'A4H') return 'none';
+  if (instantBuildType === 'FBC:A4H') return 'fbc';
+  return 'cash';
+}
+
+/** PopupInstantBuild.showPopupParams (:68-77): TID_INSTANTBUILD_TEXT1 (no helpers yet) or TEXT2 with the helper count; both get 100 / amountOfHelp as a %. */
+export function helpPopupText(helpers: number, percent = ASK_HELP_ACCELERATE_PERCENT): { tid: string; params: string[] } {
+  const per = (100 / (100 / percent)).toFixed(0); // getAmountOfHelp = 100 / percent; shown = 100 / amountOfHelp
+  return helpers === 0 ? { tid: 'TID_INSTANTBUILD_TEXT1', params: [per] } : { tid: 'TID_INSTANTBUILD_TEXT2', params: [String(helpers), per] };
+}

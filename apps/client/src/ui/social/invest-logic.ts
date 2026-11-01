@@ -64,5 +64,16 @@ export function timeLeftLabel(ms: number): { n: number; hours: boolean } {
   return { n: h, hours: true };
 }
 
+/**
+ * InvestManager.friendsToInvestPopulate (:133-162): a friend is excluded when any investment has the same extId, whatever its state;
+ * then getFriendsToInvest sorts by name with sortCompareFunctionName (:164-180), a plain string compare.
+ */
+export function friendsToInvest<T extends { extId: string; name: string }>(friends: T[], invests: Pick<InvestObject, 'extId'>[]): T[] {
+  const taken = new Set(invests.map((i) => i.extId));
+  return friends
+    .filter((f) => !taken.has(f.extId))
+    .sort((a, b) => (a.name > b.name ? 1 : a.name < b.name ? -1 : 0));
+}
+
 /** Success percentage shown in the statistics panel (InvestManager.statsGetInvestmentSuccessPercentage). */
 export const successPercentage = (started: number, rewarded: number): number => (started > 0 ? Math.trunc((100 * rewarded) / started) : 0);

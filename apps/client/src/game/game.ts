@@ -122,6 +122,8 @@ export interface GameEvents {
   "commerce-population": { sid: string; sku: string; nameType: string; population: number };
   /** Click on a club waiting for its crew (StateOnHireCrewOwner.doDoClick). */
   "hire-crew": { sid: string };
+  /** The HQ skin changed (Map.launchHQSkinAnimation: ItemDecoration.currentSku = skin): the view redraws the item. */
+  "item-skin": { sid: string; skin: string };
   /** Click on the Headquarters (StateOnHeadQuarter.doClick: PopupValue). */
   "hq-click": { sid: string };
   /** Double-rent prize pushed by the server (UserDataFacadeOnline "doubleRent"). */
@@ -135,6 +137,8 @@ export interface PollNotice {
   type: string;
   sku?: string;
   extra?: string;
+  /** collect only: the house carried a visitor upgrade (StateItemObject.upgradeGetEnabled, StateOnRent.as:1478-1481). */
+  upgraded?: boolean;
 }
 
 type Listener<T> = (payload: T) => void;
@@ -587,6 +591,17 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     else delete p.state.contractSku;
   }
 
+  /**
+   * Collectible group reward of type "hq": Map.launchHQSkinAnimation (Map.as:394-407) sets the HQ's skin decoration currentSku (mFinalSkin =
+   * the group's rewardSku, Map.launchAutoScroll :2527) and the HQ is redrawn at once. The save/command side is unchanged (GET_REWARD).
+   */
+  setHqSkin(skin: string): void {
+    const hq = this.items().find((i) => i.sku === "HeadQuarter");
+    if (!hq) return;
+    hq.placed.skin = skin;
+    this.emit("item-skin", { sid: hq.sid, skin });
+  }
+
   items(): GameItem[] {
     return [...this.itemMap.values()];
   }
@@ -842,8 +857,8 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
   }
 
   /** Force-send queued commands and wait for the responses. */
-  async flush(): Promise<void> {
-    await this.queue.drain();
+  async flush(): Promise<PacketCommand[]> {
+    return this.queue.drain();
   }
 
   // ---- build ---------------------------------------------------------------------------------------------------------
@@ -1451,7 +1466,7 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
     this.changed(item);
     this.emit("sound", { event: "collect_rent" });
     // StateOnRent.giveIncome (:1471-1484): collect <nameType>%<contract time sku> + nameType + sku.
-    this.poll("collect", sku, contract ? String(contract.incomeTimeMs / 3_600_000) : undefined);
+    this.poll("collect", sku, contract ? String(contract.incomeTimeMs / 3_600_000) : undefined, !item.isCommerce && upType !== undefined);
     this.emit("rent-collected", { sid, sku, coins, exp: xp, doubled, houses: perHouse });
     // No toast: the original only shows the floating PointsAnimation texts (ui/economy/fx.ts).
     this.emitProfile();
@@ -1910,9 +1925,9 @@ export class Game extends Emitter<GameEvents> implements ToolHost {
   }
 
   /** Announce a mission-relevant occurrence (PollManager.registerEvent call sites); other areas call this for investment/visit... */
-  poll(type: string, sku?: string, extra?: string): void {
+  poll(type: string, sku?: string, extra?: string, upgraded?: boolean): void {
     if (this.tutorial && !this.tutorial.pollsEnabled) return; // PollManager.registerEvent: only after smTutorialEnd (PollManager.as:115)
-    this.emit("poll", { type, sku, extra });
+    this.emit("poll", { type, sku, extra, ...(upgraded ? { upgraded } : {}) });
   }
 
   /** StorageManager.addItem for reward items: the storage area listens to "storage-added". */

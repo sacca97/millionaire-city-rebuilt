@@ -19,6 +19,7 @@ import {
   buildStore, GroupState, parseSetReward, type CollectibleDef, type CollectibleStore, type GroupDef,
 } from './collectibles-logic';
 import { parseFlags } from '../../game/missions';
+import { flyRewardPlane } from '../extras/plane';
 import { loadRuleXml } from './rules-xml';
 import { childAtFrame, inkFilter, place, playClip } from './util';
 
@@ -384,12 +385,25 @@ export class CollectiblesUI {
       game.toast(getText('TID_POPUP_COLLECTIBLES_COLLECTION_COMPLETED_BUTTON'));
       return;
     }
+    if (g.rewardType === 'plane') {
+      // :159-165: with a plane already in the air nothing happens; otherwise the claim (showCelebratePopup) runs when the plane has left.
+      void flyRewardPlane(this.ctx, g.reward).then((flew) => { if (flew) this.finishClaim(g); });
+      return;
+    }
+    this.finishClaim(g);
+  }
+
+  /** PopupCollectibleManager.showCelebratePopup (:73-136): GET_REWARD, trade-in, then the celebrate popup. */
+  private finishClaim(g: GroupDef): void {
+    const { game } = this.ctx;
     let gain = { exp: 0, coins: 0, cash: 0 };
     const rd = this.store.rewards.get(g.reward);
     if (g.rewardType === 'set') gain = parseSetReward(rd?.value);
     game.applyGain(gain);
     game.sendCommand(game.commands.collectible('GET_REWARD', { sid: '-1', sku: g.sku, gained: gain }));
     this.store.claim(g.sku);
+    // Map.launchHQSkinAnimation (Map.as:394-407, after the auto-scroll to the HQ) applies the new skin before the celebrate popup.
+    if (g.rewardType === 'hq') game.setHqSkin(g.reward);
     void this.showCelebrate(g.sku);
   }
 

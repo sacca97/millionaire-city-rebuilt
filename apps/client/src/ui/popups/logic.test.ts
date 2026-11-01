@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contractSlot, goldForCoins, parseExpansionPrices, plotAction, priceFor } from './logic';
+import { helpPopupText, instantBuildButton, opensHelpPopup, contractSlot, goldForCoins, parseExpansionPrices, plotAction, priceFor } from './logic';
 
 describe('popup logic', () => {
   it('rounds gold up like convertToGold', () => {
@@ -22,5 +22,16 @@ describe('popup logic', () => {
     expect(contractSlot(0)).toEqual({ page: 0, x: -114, y: -80 });
     expect(contractSlot(4)).toEqual({ page: 0, x: 0, y: 67 });
     expect(contractSlot(6).page).toBe(1);
+  });
+  it('routes instant build types like StateOnConstructionOwner.doDoClick', () => {
+    expect(opensHelpPopup('CASH')).toBe(false);
+    for (const t of ['A4H', 'FBC:A4H', 'CASH:FBC:A4H']) expect(opensHelpPopup(t)).toBe(true);
+    expect(instantBuildButton('A4H')).toBe('none');
+    expect(instantBuildButton('FBC:A4H')).toBe('fbc');
+    expect(instantBuildButton('CASH:FBC:A4H')).toBe('cash');
+  });
+  it('help popup text', () => {
+    expect(helpPopupText(0)).toEqual({ tid: 'TID_INSTANTBUILD_TEXT1', params: ['10'] });
+    expect(helpPopupText(3)).toEqual({ tid: 'TID_INSTANTBUILD_TEXT2', params: ['3', '10'] });
   });
 });

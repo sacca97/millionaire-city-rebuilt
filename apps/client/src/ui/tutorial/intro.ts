@@ -3,7 +3,7 @@
  * PopupSelectBoss (hud.swf `popup_select_advisor`: choose Ronald or Cindy; stores `boss_genre`), whose chosen advisor clip
  * `popup_select_advisor_boss_0N` plays before the state ends (PopupSelectBoss.checkAnim -> EVENT_CLOSE).
  *
- * The shipped splash.swf is a 587-byte recreation without art (apps/server/assets/splash.swf), so the splash is a plain
+ * The shipped splash.swf is a 587-byte recreation without art (apps/server-rs/assets/splash.swf), so the splash is a plain
  * title card of the same duration class.
  */
 import { Button } from "../../gui/button";

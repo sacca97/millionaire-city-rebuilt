@@ -1,5 +1,5 @@
 // WelcomeProgress popup chain (model/WelcomeProgress.as:447-833), started at run-state entry when the tutorial is over (DollarsGame.as:1596-1601).
-// Server answer (apps/server get_welcome_progress = GamePlay.java:972-986): attributes `help` (help2applies not yet welcomed), `invest`,
+// Server answer (server get_welcome_progress = GamePlay.java:972-986): attributes `help` (help2applies not yet welcomed), `invest`,
 // `newItems`, `npc<Sku>TimeLeft` (daily-bonus timers, ms), `allItemsUnlockables`, `vip`, optional child `loginSourceParam` {sku, extId, itemSku}.
 // There is NO `ranking` / `buildings` field: ranking is Company-side (smRanking) and buildings come from Company.progressGetEventCount.
 // Steps implemented (others need Facebook/CRM/friends): 1 DAILY_BONUS lives in ui/rewards (popup opens by itself; the chain waits for it),

@@ -44,6 +44,21 @@ export function parsePlaneRewards(xml: string): Map<string, string> {
 
 let flying = false;
 
+/** Plane.isActive: a plane (start-up or reward) is in the air. */
+export const isPlaneFlying = (): boolean => flying;
+
+/**
+ * PopupCollectibleManager.claimReward, TYPE_PLANE branch (:159-165): only when no plane is active, setPlane stores Profile.planeSku
+ * and the plane flies; the caller continues (GET_REWARD, celebrate popup) when it has left (Plane.EVENT_OPEN_POPUPCOLLECTIBLEGROUP).
+ * Resolves false, doing nothing, while another plane is flying.
+ */
+export async function flyRewardPlane(ctx: UiContext, sku: string): Promise<boolean> {
+  if (flying) return false;
+  ctx.game.state.profile.raw.planeSku = sku;
+  await flyPlane(ctx, sku, ctx.game.state.profile.cityName).catch(() => undefined);
+  return true;
+}
+
 export async function flyPlane(ctx: UiContext, sku: string, cityName: string): Promise<void> {
   if (flying) return;
   flying = true;
@@ -97,17 +112,4 @@ export async function mountPlane(ctx: UiContext): Promise<void> {
   };
   window.setTimeout(start, 1500);
 
-  // Plane collection reward claimed (update_collectible GET_REWARD for a group whose reward is a plane): fly the new plane.
-  const rewards = parsePlaneRewards(await (await fetch('/mcity/0.501/Datas/rules/collectiblesGroupsDefinitions.xml')).text());
-  const game = ctx.game;
-  const original = game.sendCommand.bind(game);
-  game.sendCommand = (cmd) => {
-    original(cmd);
-    const dat = cmd?._dat as { action?: string; sku?: string } | undefined;
-    const plane = cmd?._cmd === 'update_collectible' && dat?.action === 'GET_REWARD' ? rewards.get(String(dat.sku)) : undefined;
-    if (plane) {
-      profile.raw.planeSku = plane; // Plane.setPlane stores Profile.planeSku
-      void flyPlane(ctx, plane, game.state.profile.cityName).catch(() => undefined);
-    }
-  };
 }

@@ -52,6 +52,8 @@ Areas checked and found to match the original (no action): shop tab membership (
 
 ## F5 (medium) Locked-mission preview order compares unlockSku numerically
 
+- Status: FIXED (locked preview compare). The Up list sort is left numeric: the comment at `missions.ts:~582` cites oracle hud-tour 05 (1, 2, 5, 10) against the string compare in `sortMissionsBySku`; still unresolved.
+
 - Ours: `apps/client/src/game/missions.ts:717-728` (`compareLocked`): `Number(da.unlockSku)` vs `Number(db.unlockSku)`.
 - Original: `missions/MissionObjectManager.as:101-141` (`sortMissionsLocked`): `_loc3_.unlockSku > _loc4_.unlockSku` where `MissionDefinition.unlockSku` is a `String` (`MissionDefinition.as:267`), so it is a string comparison ("10" < "2").
 - Example (missionDefinitions.xml, 122 missions have an `unlockSku`): original order starts 25 (unlock "10"), 293, 255, 267, ...; ours starts 18 (unlock "2"), 21, 25, 3, 19, ... Which locked previews are shown below the available missions (up to 6 rows total, `getMissions`) therefore differs.
@@ -67,9 +69,13 @@ Areas checked and found to match the original (no action): shop tab membership (
 
 ## F7 (low) Friends bar tie order
 
+- Status: FIXED (`rankNeighbors` sorts ascending with the original comparator, no reverse). Flash `Array.sort` is unstable, so exact tie order can still differ.
+
 - Ours: `friends.ts:36-37,178` sorts descending then reverses. The original sorts ascending by company value once (`FriendsManager.sortCompareFunctionCompanyValue`) and assigns rank `count - index`. With equal company values (e.g. the three NPCs Ronald/Cindy at 100,000,000, or a neighbour equal to you) the relative order of ties is reversed compared with the original. Fix: sort ascending directly with the same comparator and compute rank as `length - index`.
 
 ## F8 (low) Invest "pick friend" list
+
+- Status: FIXED (`invest-logic.ts friendsToInvest`).
 
 - Ours: `ui/social/invest.ts:105-107`: friends that already have an investment are excluded only when `state !== DONE_CLAIMED`; the list is not sorted.
 - Original: `InvestManager.friendsToInvestPopulate` (`:133-162`) excludes any friend present in `mInvestObjects` regardless of state, then sorts by `nameFriend` (string compare, `sortCompareFunctionName`). The whole screen is a stand-in for the Facebook friend picker, so this is cosmetic.

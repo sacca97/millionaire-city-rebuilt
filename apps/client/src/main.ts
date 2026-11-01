@@ -68,6 +68,10 @@ async function boot(): Promise<void> {
   game.on("item-added", (item) => void city.addItem(item.placed));
   game.on("item-removed", ({ sid }) => city.removeItem(sid));
   game.on("item-changed", (item) => city.moveItemView(item.sid, item.sku, item.tileX, item.tileY));
+  game.on("item-skin", ({ sid }) => {
+    const it = game.item(sid);
+    if (it) city.reskinItem(it.placed);
+  });
   game.on("ghost", (g) => city.setGhost(g));
   game.on("map", ({ kind }) => {
     void city.redrawGround(game.world);

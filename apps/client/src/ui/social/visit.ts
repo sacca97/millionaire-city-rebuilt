@@ -13,7 +13,7 @@ import { uiBus } from '../bus';
 import { getHud } from '../hud';
 import type { UiContext } from '../context';
 import { loadRuleXml } from '../rewards/rules-xml';
-import { parseUpgradeList, upgradeEligible, UPGRADE_REWARD } from './visit-logic';
+import { parseUpgradeList, upgradeEligible, upgradeRewardFor, upgradeTypeFor } from './visit-logic';
 
 const NPC_IDS = new Set(['100', '101']);
 const TILE = 32;
@@ -78,7 +78,7 @@ export class VisitController {
     const traffic = city.world.children[1];
     if (traffic) traffic.visible = false;
     await city.render(state);
-    city.centerOn(MAP_COLS / 2, MAP_ROWS / 2);
+    city.centerOnWorldHQ(state.mine.items); // DollarsGame STATE_RUN_WORLD -> Map.cameraStart (:853-860): the loaded world's HQ
     this.buildBar();
     uiBus.emit('visitStarted', { userId, name });
     // popups are shown in sequence (PopupVisit, then PopupDailyIncome); do not block the visit on them
@@ -101,7 +101,7 @@ export class VisitController {
     const traffic = city.world.children[1];
     if (traffic) traffic.visible = true;
     await city.render(game.state);
-    city.centerOn(MAP_COLS / 2, MAP_ROWS / 2);
+    city.centerOnWorldHQ(game.state.mine?.items ?? []);
     document.body.style.cursor = '';
     uiBus.emit('visitEnded');
   }
@@ -214,15 +214,24 @@ export class VisitController {
       if (this.upgradesLeft <= 0 && it.sku.startsWith('houses_')) game.toast(getText('TID_CANT_UPGRADE_MORE_TODAY'), 'info');
       return false;
     }
-    game.applyGain({ coins: UPGRADE_REWARD.coins, exp: UPGRADE_REWARD.exp });
-    // add_upgrade_item carries securityUpdate(): built right after the gain so the snapshot holds the +100 / +10
-    game.sendCommand(game.commands.addUpgradeItem({ ownerId: this.userId!, visitorId: this.ctx.conn.uid, sid: it.sid, type: 0 }));
+    // StateOnRentVisitor.as:43 sends UpgradesManager.getType() (SUPER for a partner neighbour, UpgradesManager.as:276-295); the reward follows the type
+    const type = upgradeTypeFor(this.userId!);
+    const reward = upgradeRewardFor(type);
+    game.applyGain({ coins: reward.coins, exp: reward.exp });
+    // add_upgrade_item carries securityUpdate(): built right after the gain so the snapshot holds the gain
+    // StateOnRentVisitor.as:40-41: ownerId = getProfileUniverse().owner, visitorId = getProfile().owner. mProfileUniverse is built once at
+    // load with the player's own id (DollarsGame.as:1752, Profile(owner) Profile.as:230-234) and not rebuilt on a visit, so both carry the
+    // player's numeric userId (oracle C34-69: ownerId 1, visitorId 1).
+    const me = Number(game.state.profile.raw.userId ?? 1);
+    game.sendCommand(game.commands.addUpgradeItem({ ownerId: me, visitorId: me, sid: it.sid, type }));
+    // StateOnRentVisitor.as:35 registerEvent(MISSION_EVENT_UPGRADE) -> ItemObject.as:2787-2802 (nameType, subtype, sku); counted at Home
+    game.poll('upgrade', it.sku);
     this.upgraded.add(it.sid);
     this.upgradesLeft--;
     this.updateCounter();
     this.sparkle(wx, wy);
     game.emitSound('collect_rent');
-    game.toast(`+${UPGRADE_REWARD.coins}  +${UPGRADE_REWARD.exp} xp`, 'coins');
+    game.toast(`+${reward.coins}  +${reward.exp} xp`, 'coins');
     return true;
   }
 

@@ -8,8 +8,10 @@ states otherwise.
 
 The original Millionaire City assets, client files, recovered cache files, Flash
 runtime binaries, third-party binaries, trademarks, logos, and other third-party
-material are not licensed under the MIT License. They are included only for
-preservation and runtime compatibility.
+material are not licensed under the MIT License. We are not aware of any licence
+covering them. They are included only for preservation and runtime
+compatibility: original files under `assets/`, and art converted from them
+(WebP images, audio, fonts) under `apps/client/public-opt/`.
 
 Millionaire City and related original game assets remain the property of their
 respective rights holders.

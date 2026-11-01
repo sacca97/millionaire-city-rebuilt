@@ -39,10 +39,11 @@ export async function mount(ctx: UiContext): Promise<MissionSystem> {
   // MissionObjectManager.openReward: PopupReward when a mission reaches its goal (once at a time).
   sys.manager.on("reached", (obj) => {
     sys.manager.rewardPopupOpen = true;
+    sys.manager.rewardPopupBuilding = true;
     void openRewardPopup(ctx, obj, () => {
       sys.manager.rewardPopupOpen = false;
       void panel?.render();
-    });
+    }).finally(() => (sys.manager.rewardPopupBuilding = false));
   });
   sys.manager.on("change", () => void panel?.render());
 
@@ -86,10 +87,11 @@ export async function mount(ctx: UiContext): Promise<MissionSystem> {
           sys.manager.claim(obj);
           sys.pushAlert();
           sys.manager.rewardPopupOpen = true;
+          sys.manager.rewardPopupBuilding = true;
           await openRewardPopup(ctx, obj, () => {
             sys.manager.rewardPopupOpen = false;
             void panel?.render();
-          });
+          }).finally(() => (sys.manager.rewardPopupBuilding = false));
         }
       });
       if (sku) panel?.showSku(sku);

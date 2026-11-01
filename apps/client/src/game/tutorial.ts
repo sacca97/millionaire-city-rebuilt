@@ -40,7 +40,7 @@ export const TUTORIAL_POSITIONS = {
     { x: 4, y: 4 }
   ],
   addDecoration: { x: 4, y: 1 },
-  /** The 2x2 plot the Bungalow goes on (apps/server TUTORIAL_COMPLETED_HOUSE_TILE). */
+  /** The 2x2 plot the Bungalow goes on (server save defaults TUTORIAL_COMPLETED_HOUSE_TILE, apps/server-rs/data/constants.json). */
   house: { x: 4, y: 2 }
 } as const;
 

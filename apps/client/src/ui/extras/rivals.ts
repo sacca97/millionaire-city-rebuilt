@@ -11,6 +11,7 @@ import { Widget } from '../../gui/widget';
 import { tileX, tileY } from '../../game/geometry';
 import { createTradeBox } from '../../gui/popups';
 import { ensureCoins } from '../popups/flows';
+import { uiBus } from '../bus';
 import type { UiContext } from '../context';
 import { mapHolder } from './maplayer';
 import { rivalHit } from '../hud/cursor';
@@ -20,6 +21,9 @@ import type { GameItem } from '../../game/game';
 
 const MODE_IN_SALE = 2; // StateOnIA.MODE_IN_SALE
 const SELL_BAR_MS = 3000; // StateItemObject.SELL_BAR_TIME = AGILE_BAR_TIME
+
+/** A visited city (RoleVisitor) is another world: my rival for-sale buildings are not in it, so they must not react to clicks or hover there. */
+let visiting = false;
 
 export async function mountRivals(ctx: UiContext): Promise<void> {
   const holder = mapHolder(ctx);
@@ -41,6 +45,8 @@ export async function mountRivals(ctx: UiContext): Promise<void> {
       void it;
     }
   }
+  // The signs belong to MY world's rival buildings; a visited city (RoleVisitor) has its own world, so they must not float over it.
+  uiBus.on('visitorChrome', ({ on }) => { visiting = on; for (const s of signs) s.w.root.style.display = on ? 'none' : ''; });
   const price = (s: (typeof signs)[number]): string => {
     const g = ctx.game;
     const def = ctx.defs.get(s.sku)!;
@@ -84,6 +90,7 @@ export async function mountRivals(ctx: UiContext): Promise<void> {
   window.setInterval(recompute, 700);
   // Hover: StateOnIA.doDoMouseOver -> InfoBoxCommerceRival / InfoBoxWonder + BuyCursor + the yellow footprint frame (hud/index.ts, infobox.ts).
   rivalHit.fn = (tx, ty) => {
+    if (visiting) return undefined;
     for (const c of ctx.game.state.companies) {
       if (c === ctx.game.state.mine) continue;
       for (const it of c.items) {
@@ -108,6 +115,7 @@ export async function mountRivals(ctx: UiContext): Promise<void> {
 export async function mountRivalTrade(ctx: UiContext): Promise<void> {
   const canvasAt = (e: MouseEvent): boolean => e.target instanceof HTMLCanvasElement;
   const rivalAt = (x: number, y: number) => {
+    if (visiting) return undefined;
     const t = ctx.city.pointerToTile(x, y);
     for (const c of ctx.game.state.companies) {
       if (c === ctx.game.state.mine) continue;

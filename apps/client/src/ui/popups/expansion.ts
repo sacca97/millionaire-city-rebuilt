@@ -119,6 +119,9 @@ export function mountPlotOverlays(ctx: UiContext): void {
   const layer = document.createElement('div');
   layer.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0';
   ctx.root.prepend(layer);
+  // The overlays (dim, fences, for-sale signs) describe MY plots (game.expansions). A visited city is another world (RoleVisitor): hide them, or the
+  // visitor sees (and can click) my own EXPANSION FOR SALE signs on top of the friend's houses (oracle C33: grid clicks opened Buy Expansion).
+  uiBus.on('visitorChrome', ({ on }) => void (layer.style.display = on ? 'none' : ''));
   let cursorEl: HTMLElement | undefined;
   const buyCursor = (on: boolean): void => {
     if (!cursorEl) {

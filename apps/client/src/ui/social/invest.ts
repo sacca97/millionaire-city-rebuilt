@@ -2,6 +2,7 @@
 // invests/InvestManager.as, invests/InvestDefinitionManager.as, art investment.swf, rules investDefinitions.xml.
 // Offline the "friends" you can invest in are the NPC cities (the TS server auto-accepts and finishes them); Facebook friend
 // requests, reminders and "ask for speed" are omitted.
+import { parseFlags } from '../../game/missions';
 import { Button } from '../../gui/button';
 import { coins as fmtCoins, convertNumberRanking, convertNumberToString, TRUNCATE_MILLIONS } from '../../gui/format';
 import { getText, t } from '../../gui/i18n';
@@ -13,10 +14,11 @@ import type { UiContext } from '../context';
 import { loadRuleXml } from '../rewards/rules-xml';
 import { place } from '../rewards/util';
 import {
-  InvestState, isSuccessful, parseInvestments, sortInvestments, successPercentage, timeLeftLabel, type InvestDefinition, type InvestObject,
+  friendsToInvest, InvestState, isSuccessful, parseInvestments, sortInvestments, successPercentage, timeLeftLabel, type InvestDefinition, type InvestObject,
 } from './invest-logic';
 
 const SWF = 'investment';
+const TOOLBAR_HELP_FLAG = 'investmentToolbarHelpShown'; // Profile.as:111
 const NPC_PHOTO = '/mcity/0.501/Datas/Assets/npcs/';
 
 interface Friend { extId: string; name: string; photo: string }
@@ -53,7 +55,19 @@ export class InvestUI {
   }
 
   private friend(extId: string): Friend {
-    return FRIENDS.find((f) => f.extId === extId) ?? { extId, name: extId.replace(/^npc_/, ''), photo: '' };
+    // npc_<Name> (this client) or the Facebook-style NPC ids the Rust server's shim gives the original client (…101 Ronald, …102 Cindy, …103 Sheik)
+    const byFbId = FRIENDS[Number(/^1000000000001(0[1-3])$/.exec(extId)?.[1]) - 1];
+    return FRIENDS.find((f) => f.extId === extId) ?? byFbId ?? { extId, name: extId.replace(/^npc_/, ''), photo: '' };
+  }
+
+  /** PopupInvest.as:359-362: opening the popup removes the toolbar arrow -> ToolsBar.as:1241 -> Profile.investmentSetToolbarHelpShown (Profile.as:2037-2040,
+   *  flagsSetValue :2084-2091 sends update_profile flag investmentToolbarHelpShown:1) the first time only. */
+  private setToolbarHelpShown(): void {
+    const { game } = this.ctx;
+    const raw = game.state.profile.raw;
+    if ((parseFlags(String(raw.flags ?? ''))[TOOLBAR_HELP_FLAG] ?? 0) >= 1) return;
+    raw.flags = [String(raw.flags ?? ''), `${TOOLBAR_HELP_FLAG}:1`].filter(Boolean).join(',');
+    game.sendCommand(game.commands.flag(TOOLBAR_HELP_FLAG, 1));
   }
 
   // ---- main popup ---------------------------------------------------------------------------------------------------------
@@ -61,6 +75,7 @@ export class InvestUI {
   async open(): Promise<void> {
     if (this.popup?.open) return;
     await this.reload();
+    this.setToolbarHelpShown();
     const w = await Widget.create(SWF, 'popup_investment_background');
     const p = new Popup(w);
     this.popup = p;
@@ -105,7 +120,7 @@ export class InvestUI {
         place(view, info, 0, 25);
       } else if (tab === 'pick') {
         w.setText('Caption', getText('TID_INVEST_TITLE1'), { fit: true });
-        const free = FRIENDS.filter((f) => !this.list.some((i) => i.extId === f.extId && i.state !== InvestState.DONE_CLAIMED));
+        const free = friendsToInvest(FRIENDS, this.list); // InvestManager.friendsToInvestPopulate :133-162 + name sort
         const perPage = 12;
         const maxPage = Math.max(0, Math.ceil(free.length / perPage) - 1);
         page = Math.min(page, maxPage);
@@ -265,15 +280,27 @@ export class InvestUI {
     const { game } = this.ctx;
     const ok = isSuccessful(o, this.def);
     const finish = () => {
-      game.sendCommand(game.commands.query('invest_results', { fExtId: o.extId, success: ok }));
+      // PopupInvestFail.close (:82) registers INVESTMENT before dispatching EVENT_CLOSE (-> applyInvestmentDone).
+      if (!ok) game.poll('investment');
+      // InvestManager.as:83-87 (type INVEST_TYPE_RESULTS = 5, UserDataFacade.as:222) -> UDFO.as:664-665 sendQuery("invest_results")
+      game.sendCommand(game.commands.query('invest_results', { type: 5, fExtId: o.extId, success: ok }));
       if (ok) {
-        // InvestDefinitionManager.giveReward: coins/cash (persisted with the next snapshot; update_money carries it now)
-        game.applyGain({ coins: this.def.rewardCoins, cash: this.def.rewardCash });
-        game.sendCommand(game.commands.money('invest_reward'));
-        game.toast(`+${fmtCoins(this.def.rewardCoins)}`, 'coins');
-        this.ctx.game.emitSound('reward_click');
+        // PopupInvestSuccess.close (:99-100): after EVENT_CLOSE, INVESTMENT_DONE then INVESTMENT.
+        game.poll('investmentDone');
+        game.poll('investment');
       }
-      void game.flush().then(changed);
+      // UDFO.as:1456-1462: the reward is given on the success response (InvestDefinitionManager.giveReward -> Reward.apply +
+      // delayedPaymentPay, no update_money); the snapshot of the next command persists it.
+      void game.flush().then((res) => {
+        const r = res.find((c) => c._cmd === 'invest_results');
+        const success = (r?._dat as Record<string, unknown> | undefined)?.success;
+        if (ok && String(success) === 'true') {
+          game.applyGain({ coins: this.def.rewardCoins, cash: this.def.rewardCash });
+          game.toast(`+${fmtCoins(this.def.rewardCoins)}`, 'coins');
+          this.ctx.game.emitSound('reward_click');
+        }
+        changed();
+      });
     };
     let w: Widget;
     if (ok) {

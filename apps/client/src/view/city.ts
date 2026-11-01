@@ -218,6 +218,12 @@ export class CityView {
     }
   }
 
+  /** Redraws an item with its current skin (HQ skin reward): the view is rebuilt from the placed item. */
+  reskinItem(placed: PlacedItem): void {
+    this.removeItem(placed.sid);
+    void this.addItem(placed);
+  }
+
   /** Re-places an item's view after a move (absolute tile of the footprint's top-left). */
   moveItemView(sid: string, sku: string, tx: number, ty: number): void {
     this.views.get(sid)?.view.setTile(tx, ty, this.viewConfig(sku, tx, ty).depth);
@@ -446,6 +452,14 @@ export class CityView {
     this.world.x = Math.trunc(-(hq.tileX * TILE + (hq.cols * TILE) / 2) * s + this.app.screen.width / 2);
     this.world.y = Math.trunc(-(hq.tileY * TILE + (hq.rows * TILE) / 2) * s + this.app.screen.height / 3 + 25);
     this.clampCamera();
+  }
+
+  /** Map.cameraStart for a freshly loaded world (own city after Home, or a visited city): look at that world's HQ. */
+  centerOnWorldHQ(items: readonly { sku: string; x: number; y: number }[]): void {
+    const hq = items.find((i) => i.sku === "HeadQuarter");
+    const def = hq ? this.defs.get(hq.sku) : undefined;
+    if (hq && def) this.centerOnHQ({ tileX: tileX(hq.x), tileY: tileY(hq.y), cols: def.cols, rows: def.rows });
+    else this.centerOn(MAP_COLS / 2, MAP_ROWS / 2);
   }
 
   /** Map.cameraStart tutorial branch (:861-867): map centred horizontally (+1 tile), vertically in the area above the friends bar. */

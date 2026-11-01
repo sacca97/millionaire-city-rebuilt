@@ -40,6 +40,11 @@ export class PopupManager {
     window.removeEventListener('keydown', this.keyHandler);
     window.addEventListener('keydown', this.keyHandler);
   }
+  /**
+   * DollarsGame.mShowPopup: set when a popup is shown (Popup.as:90) and, when one closes, set to "popups still open" (Popup.as:228); a
+   * PopupMessage then clears it (PopupMessage.as:88, `clearsShowFlag`) even if other popups remain open below it.
+   */
+  showPopupFlag = false;
   get isAnyOpen(): boolean {
     return this.stack.length > 0;
   }
@@ -49,12 +54,14 @@ export class PopupManager {
   /** @internal */
   _push(p: Popup): void {
     this.stack.push(p);
+    this.showPopupFlag = true;
     this.relayer();
   }
   /** @internal */
   _remove(p: Popup): void {
     const i = this.stack.indexOf(p);
     if (i >= 0) this.stack.splice(i, 1);
+    this.showPopupFlag = this.stack.length > 0 && !p.clearsShowFlag;
     this.relayer();
   }
   private relayer(): void {
@@ -82,6 +89,8 @@ export class Popup {
   readonly dim: HTMLDivElement;
   readonly boxEl: HTMLDivElement;
   closeOnEscape = true;
+  /** PopupMessage.close sets DollarsGame.mShowPopup = false after the base close (PopupMessage.as:88). */
+  clearsShowFlag = false;
   /** Draw the modal dim (Popup constructor param mDrawBackground). */
   drawBackground = true;
   open = false;
