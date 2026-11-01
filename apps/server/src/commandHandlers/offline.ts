@@ -287,16 +287,19 @@ export function getDailyRewardGroupByDay(day: number): number {
 }
 
 /**
- * get_daily_rewards_info: advances the stored progress at login. > 24h since the last given date => a reward is due;
- * > 48h => streak reset (count 0, history cleared), else count + 1. A new nextRewardId is rolled for the new count.
+ * get_daily_rewards_info (GamePlay.java:925-953). A reward is due once more than smDailyRewardTime has passed since the
+ * stored last-given date. > 2x that => streak reset (stored count 0, history cleared, answer count 1); otherwise the answer
+ * carries count + 1. Like the original (saved only on reset, GamePlay.java:950), the advanced count is NOT stored here: the
+ * claim stores it (applyDailyRewardGiven). A new nextRewardId is rolled for the answered count.
  */
 export function refreshDailyRewardsInfo(
   doc: MutableNode,
   nowMs: number,
   random: () => number = Math.random
-): { changed: boolean; reset: boolean } {
+): { changed: boolean; reset: boolean; answerCount?: string } {
   let changed = false;
   let reset = false;
+  let answerCount: string | undefined;
   const lastDate = Number(doc.dailyRewardsLastGivenDate ?? "0") || 0;
   const diff = nowMs - lastDate;
   if (diff > DAILY_REWARD_TIME_MS) {
@@ -305,20 +308,38 @@ export function refreshDailyRewardsInfo(
       doc.dailyRewardsCount = "0";
       doc.dailyRewardsLastGiven = "";
       reset = true;
+      answerCount = "1"; // GamePlay.java:953
     } else {
       count = (Number(doc.dailyRewardsCount ?? "0") || 0) + 1;
-      doc.dailyRewardsCount = String(count);
+      answerCount = String(count); // GamePlay.java:934-935
     }
     doc.dailyRewardsNextRewardId = pickDailyRewardByDay(count, random) ?? "";
     changed = true;
   }
-  return { changed, reset };
+  return { changed, reset, answerCount };
 }
 
-/** update_daily_reward: count + 1, last-given date = local 00:10 of today, history keeps the last 5 skus. */
+/**
+ * update_daily_reward gate, ported from the original's two checks:
+ * - GamePlay.java:1807-1810 / SecurityNormal.java:641: no reward due (stored date not older than smDailyRewardTime) => refused.
+ *   The original keeps this as an in-session flag set by get_daily_rewards_info; the stored date is the persisted equivalent.
+ * - SecurityNormal.java:645-655: the claimed day is count + 1 (GamePlay.java:1808); a 2x-overdue claim is day 1 (state 2).
+ *   The sku must belong to that day's group (DailyRewardsRules.getGroupByDay), else refused.
+ */
+export function dailyRewardClaimAllowed(doc: MutableNode, sku: string, nowMs: number): boolean {
+  const diff = nowMs - (Number(doc.dailyRewardsLastGivenDate ?? "0") || 0);
+  if (!(diff > DAILY_REWARD_TIME_MS)) {
+    return false;
+  }
+  const days = diff > 2 * DAILY_REWARD_TIME_MS ? 1 : (Number(doc.dailyRewardsCount ?? "0") || 0) + 1;
+  const def = getDailyRewardDefinition(sku);
+  return def !== undefined && def.group === getDailyRewardGroupByDay(days);
+}
+
+/** update_daily_reward when the claim passes: count + 1, last-given date = local 00:10 of today, history keeps the last 5 skus. */
 export function applyDailyRewardGiven(doc: MutableNode, sku: string, nowMs: number): void {
   const date = new Date(nowMs);
-  date.setHours(0, 10, 0, 0);
+  date.setHours(0, 10, 0, 0); // GamePlay.java:1813-1821 (Calendar hour 0, minute 10)
   doc.dailyRewardsLastGivenDate = String(date.getTime());
   let given = `${String(doc.dailyRewardsLastGiven ?? "")}${sku},`;
   if (given.split(",").length > 6) {

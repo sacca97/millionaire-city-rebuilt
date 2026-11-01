@@ -6,6 +6,7 @@ import type { JsonObject } from "@mcity/shared/dist/types.js";
 import { createServerApp as createServerAppBase } from "../src/serverApp.js";
 import { getServerConfig } from "../src/config.js";
 import { CommandService } from "../src/commandHandlers.js";
+import { getDailyRewardDefinition } from "../src/commandHandlers/offline.js";
 
 const activeApps: Array<ReturnType<typeof createServerAppBase>> = [];
 
@@ -121,6 +122,63 @@ describe("offline server gaps (ported from the recovered Java backend)", () => {
     expect(reset.dailyRewardsLastGiven).toBe("");
   });
 
+  test("daily reward claim is once per day, granted the next day (GamePlay.java:1787-1834, SecurityNormal.java:641)", () => {
+    const { repo, send, profile } = setup();
+    const daily = () => repo.getDocument<Record<string, string>>(1, "dailyBonusInfo");
+    const gainField = (sku: string) => {
+      const def = getDailyRewardDefinition(sku);
+      return { value: Number(def?.bonusValue), field: def?.bonusType === "exp" ? "exp" : def?.bonusType === "cash" ? "DCCash" : "DCCoins" };
+    };
+
+    // Day 1: first claim is accepted and grants the definition's reward.
+    const first = send("get_daily_rewards_info", {}) as Record<string, string>;
+    const { value, field } = gainField(first.dailyRewardsNextRewardId);
+    const before = Number(profile()[field] ?? 0);
+    expect(send("update_daily_reward", { sku: first.dailyRewardsNextRewardId, security: undefined })).not.toHaveProperty("success");
+    expect(Number(profile()[field])).toBe(before + value);
+    expect(daily().dailyRewardsCount).toBe("1");
+    const stored = daily().dailyRewardsLastGivenDate;
+    const lastGiven = daily().dailyRewardsLastGiven;
+    const storedDate = new Date(Number(stored));
+    expect(storedDate.getHours()).toBe(0); // GamePlay.java:1813-1816: local 00:10 of the claim day
+    expect(storedDate.getMinutes()).toBe(10);
+
+    // Same day: a second claim (even the same sku) is refused, nothing granted or stored.
+    const again = send("update_daily_reward", { sku: first.dailyRewardsNextRewardId, security: undefined });
+    expect(again).toEqual({ success: "false" });
+    expect(Number(profile()[field])).toBe(before + value);
+    expect(daily().dailyRewardsCount).toBe("1");
+    expect(daily().dailyRewardsLastGivenDate).toBe(stored);
+    expect(daily().dailyRewardsLastGiven).toBe(lastGiven);
+
+    // Next day (stored date faked 25h back): due again, the answer is day 2 and its group-2 reward is accepted.
+    const yesterday = { ...daily(), dailyRewardsLastGivenDate: String(Date.now() - 25 * 3_600_000) };
+    repo.setDocument(1, "dailyBonusInfo", yesterday);
+    const second = send("get_daily_rewards_info", {}) as Record<string, string>;
+    expect(second.dailyRewardsCount).toBe("2");
+    expect(daily().dailyRewardsCount).toBe("1"); // the advanced count is answered, stored only by the claim
+    const next = gainField(second.dailyRewardsNextRewardId);
+    const beforeNext = Number(profile()[next.field] ?? 0);
+    expect(send("update_daily_reward", { sku: second.dailyRewardsNextRewardId, security: undefined })).not.toHaveProperty("success");
+    expect(Number(profile()[next.field])).toBe(beforeNext + next.value);
+    expect(daily().dailyRewardsCount).toBe("2");
+  });
+
+  test("daily reward claim is refused when the sku is not in the day's group (SecurityNormal.java:649-655)", () => {
+    const { repo, send, profile } = setup();
+    const first = send("get_daily_rewards_info", {}) as Record<string, string>;
+    expect(send("update_daily_reward", { sku: first.dailyRewardsNextRewardId })).not.toHaveProperty("success");
+
+    // Day 2 is group 2 (reward_04..06): a group-1 sku is refused, a group-2 sku is accepted.
+    const stored = repo.getDocument<Record<string, string>>(1, "dailyBonusInfo");
+    repo.setDocument(1, "dailyBonusInfo", { ...stored, dailyRewardsLastGivenDate: String(Date.now() - 25 * 3_600_000) });
+    const coinsBefore = Number(profile().DCCoins ?? 0);
+    expect(send("update_daily_reward", { sku: "reward_02" })).toEqual({ success: "false" });
+    expect(Number(profile().DCCoins ?? 0)).toBe(coinsBefore);
+    expect(send("update_daily_reward", { sku: "reward_05" })).not.toHaveProperty("success");
+    expect(Number(profile().DCCoins ?? 0)).toBe(coinsBefore + 20000);
+  });
+
   test("missions follow up -> reached -> given and pay the definition reward once (GamePlay.java:1346)", () => {
     const { send, profile, setProfile, children, repo } = setup();
     setProfile({ DCCoins: "1000", exp: "0" });
@@ -176,7 +234,8 @@ describe("offline server gaps (ported from the recovered Java backend)", () => {
 
   test("daily item rewards go to storage", () => {
     const { send, children } = setup();
-    send("update_daily_reward", { sku: "reward_20", security: { item: "decorations_font_06" } });
+    // reward_20 is a dated group-6 reward, not in day 1's group, so the claim is refused; reward_01 is a day-1 sku.
+    send("update_daily_reward", { sku: "reward_01", security: { item: "decorations_font_06" } });
     expect(children("storageList").find((e) => e.sku === "decorations_font_06")?.amount).toBe("1");
   });
 
@@ -284,9 +343,27 @@ describe("offline server gaps (ported from the recovered Java backend)", () => {
     const list = send("get_investments_list", {}) as { investmentsList: Array<Record<string, string>> };
     expect(list.investmentsList[0]?.state).toBe("3");
     expect(send("invest_results", { fExtId: "9" }).success).toBe("true");
-    const after = send("get_investments_list", {}) as { investmentsList: unknown[]; investmentsRewarded: string };
-    expect(after.investmentsList).toHaveLength(0);
+    const after = send("get_investments_list", {}) as { investmentsList: Array<Record<string, string>>; investmentsRewarded: string };
+    // GamePlay.java getInvestmentsList keeps `state < 11`: the claimed (10) entry is still listed
+    expect(after.investmentsList.map((e) => e.state)).toEqual(["10"]);
     expect(after.investmentsRewarded).toBe("1");
+    // another invest_* command must not drop the claimed entry from the save, and the same friend stays refused (investOnFriend)
+    expect(send("invest_on_friend", { fExtId: "7" }).id).not.toBe("null");
+    expect(send("invest_on_friend", { fExtId: "9" }).id).toBe("null");
+    const stored = repo.getDocument<Record<string, Array<Record<string, string>>>>(1, "investmentsList");
+    expect(stored.investmentsList.filter((e) => "investment" in e).map((e) => e.extId)).toEqual(["9", "7"]);
+  });
+
+  test("a failed (state 11) investment is hidden from the list but kept in the save", () => {
+    const { repo, send } = setup();
+    send("invest_on_friend", { fExtId: "9" });
+    const doc = repo.getDocument<Record<string, Array<Record<string, string>>>>(1, "investmentsList");
+    doc.investmentsList[0].state = "11";
+    repo.setDocument(1, "investmentsList", doc as unknown as JsonObject);
+    expect((send("get_investments_list", {}) as { investmentsList: unknown[] }).investmentsList).toHaveLength(0);
+    send("invest_on_friend", { fExtId: "7" });
+    const stored = repo.getDocument<Record<string, Array<Record<string, string>>>>(1, "investmentsList");
+    expect(stored.investmentsList.filter((e) => "investment" in e).map((e) => e.state)).toEqual(["11", "2"]);
   });
 
   test("get_world for NPCs and unknown ids never returns the player's own city", () => {

@@ -96,6 +96,7 @@ import {
   addUnlockedItem,
   adjustStorage,
   applyDailyRewardGiven,
+  dailyRewardClaimAllowed,
   applyProfileFlag,
   applyServicePresentationShown,
   applyServicePurchase,
@@ -275,9 +276,9 @@ export class CommandService {
         if (refresh.changed) {
           this.repository.setDocument(userId, SAVE_TAGS.dailyBonus, dailyDocument);
         }
-        const dailyAnswer = refresh.reset ? { ...dailyDocument, dailyRewardsCount: "1" } : dailyDocument;
-        // GamePlay.java:953: after a streak reset (stored 0) the answer carries count 1.
-        return dailyAnswer;
+        // GamePlay.java:953: after a streak reset (stored 0) the answer carries count 1; otherwise the advanced count
+        // (GamePlay.java:935) is answered but stored only by the claim.
+        return refresh.answerCount !== undefined ? { ...dailyDocument, dailyRewardsCount: refresh.answerCount } : dailyDocument;
       }
       case "get_partners_list":
         return this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.partners);
@@ -325,7 +326,10 @@ export class CommandService {
         this.applyPollManagerMutation(userId, payload);
         break;
       case "update_daily_reward":
-        this.applyDailyRewardMutation(userId, payload);
+        if (!this.applyDailyRewardMutation(userId, payload)) {
+          // Refused claim: no state change, so no sync increment.
+          return [{ _cmd: command._cmd, _dat: { success: "false" }, _sync: this.repository.getSession(userId)?.sync ?? DEFAULT_SYNC }];
+        }
         break;
       case "update_next_rent":
         this.applyNextRentMutation(userId, payload);
@@ -374,7 +378,9 @@ export class CommandService {
 
   /** invest_* (GamePlay.java:1135-1284) against the investments list document, with auto-accepting offline friends. */
   private handleInvestCommand(userId: number, cmd: string, payload: Record<string, unknown>): JsonObject {
-    const doc = this.getInvestmentsDocument(userId);
+    // The stored document, not the list view: saving the view would drop the hidden entries (the original never deletes a row, and
+    // investOnFriend :1144-1150 refuses any friend that already has one, whatever its state).
+    const doc = this.loadInvestmentsDocument(userId);
     const children = getElementChildren(doc, "investmentsList");
     const extId = String(payload.fExtId ?? "");
     const now = Date.now();
@@ -446,25 +452,37 @@ export class CommandService {
     }
   }
 
-  /** get_investments_list (GamePlay.java:610-695): advance finished investments and hide state >= 10. */
-  private getInvestmentsDocument(userId: number): JsonObject {
+  /** The stored investments document with finished investments advanced (state 2 -> 3) and saved. */
+  private loadInvestmentsDocument(userId: number): JsonObject {
     const doc = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.investments);
     if (refreshInvestments(doc, Date.now())) {
       this.repository.setDocument(userId, SAVE_TAGS.investments, doc);
     }
+    return doc;
+  }
+
+  /** get_investments_list (GamePlay.java:610-695): a read-only view; the query keeps `state < 11`, so claimed (10) entries are sent. */
+  private getInvestmentsDocument(userId: number): JsonObject {
+    const doc = this.loadInvestmentsDocument(userId);
     const started = doc.investmentsStarted ?? "0";
     const rewarded = doc.investmentsRewarded ?? "0";
     const visible = (getElementChildren(doc, "investmentsList") as JsonObject[]).filter(
-      (entry) => Number((entry as JsonObject).state ?? "1") < 10
+      (entry) => Number((entry as JsonObject).state ?? "1") < 11
     );
     return { ...doc, investmentsStarted: String(started), investmentsRewarded: String(rewarded), investmentsList: visible };
   }
 
-  private applyDailyRewardMutation(userId: number, payload: Record<string, unknown>): void {
-    // GamePlay.updateDailyReward (GamePlay.java:1787-1834). The original rejects (SecurityFail) a claim when no reward is
-    // due or the sku does not belong to the day's group; the offline server accepts any known sku instead.
+  /** Returns false (nothing stored or granted) when the claim is refused. */
+  private applyDailyRewardMutation(userId: number, payload: Record<string, unknown>): boolean {
+    // GamePlay.updateDailyReward (GamePlay.java:1787-1834): the original throws SecurityFail (GamePlay.java:1810 via
+    // SecurityNormal.java:641/649) when no reward is due or the sku is not in the day's group. The gate is in
+    // dailyRewardClaimAllowed; a refused claim is answered with success "false" (as the other refusals here) and the
+    // client, which ignores the reply, grants nothing server-side.
     const sku = String(payload.sku ?? "");
     const doc = this.repository.getDocument<JsonObject>(userId, SAVE_TAGS.dailyBonus);
+    if (!dailyRewardClaimAllowed(doc, sku, Date.now())) {
+      return false;
+    }
     applyDailyRewardGiven(doc, sku, Date.now());
     this.repository.setDocument(userId, SAVE_TAGS.dailyBonus, doc);
 
@@ -490,6 +508,7 @@ export class CommandService {
       adjustStorage(storage, item, 1);
       this.repository.setDocument(userId, SAVE_TAGS.storage, storage);
     }
+    return true;
   }
 
   private applyNextRentMutation(userId: number, payload: Record<string, unknown>): void {
