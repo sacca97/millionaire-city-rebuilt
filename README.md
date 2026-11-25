@@ -14,10 +14,6 @@ For normal play, use a portable release for your operating system:
 
 No installer is required.
 
-## Community
-
-Join the [Millionaire City Rebuilt Discord server](https://discord.gg/cr6M7UAh4J).
-
 ## Building
 
 To build from source, install Node.js with npm and a Java runtime first. Node.js 20 and Java 21 are recommended.
