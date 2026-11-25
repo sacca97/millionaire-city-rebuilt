@@ -54,6 +54,8 @@ fn e<E: std::fmt::Display>(err: E) -> String {
 #[derive(Default)]
 struct DocCache {
     version: Option<i64>,
+    /// `Database::rollbacks` when filled: a rolled-back request leaves values here that are not in the file.
+    rollbacks: u64,
     docs: HashMap<i64, HashMap<String, Value>>,
 }
 
@@ -77,7 +79,11 @@ impl SaveRepository {
     }
 
     /// Drops the cache when another connection committed since it was filled; call with the connection lock held.
-    fn validate_cache(conn: &rusqlite::Connection, cache: &mut DocCache) {
+    fn validate_cache(conn: &rusqlite::Connection, cache: &mut DocCache, rollbacks: u64) {
+        if cache.rollbacks != rollbacks {
+            cache.docs.clear();
+            cache.rollbacks = rollbacks;
+        }
         let version: Option<i64> = conn
             .prepare_cached("PRAGMA data_version")
             .and_then(|mut st| st.query_row([], |r| r.get(0)))
@@ -97,7 +103,7 @@ impl SaveRepository {
     fn load_doc(&self, user_id: i64, tag: &str) -> Res<Option<Result<Value, String>>> {
         let conn = self.database.conn();
         let mut cache = self.cache.lock().unwrap_or_else(|p| p.into_inner());
-        Self::validate_cache(&conn, &mut cache);
+        Self::validate_cache(&conn, &mut cache, self.database.rollbacks.load(std::sync::atomic::Ordering::SeqCst));
         if let Some(doc) = cache.docs.get(&user_id).and_then(|m| m.get(tag)) {
             return Ok(Some(Ok(doc.clone())));
         }
@@ -290,7 +296,7 @@ impl SaveRepository {
         let json = serde_json::to_string(document).map_err(e)?;
         let conn = self.database.conn();
         let mut cache = self.cache.lock().unwrap_or_else(|p| p.into_inner());
-        Self::validate_cache(&conn, &mut cache);
+        Self::validate_cache(&conn, &mut cache, self.database.rollbacks.load(std::sync::atomic::Ordering::SeqCst));
         let written = conn
             .prepare_cached("INSERT OR REPLACE INTO save_documents (user_id, tag, json, updated_at) VALUES (?1, ?2, ?3, ?4)")
             .map_err(e)?

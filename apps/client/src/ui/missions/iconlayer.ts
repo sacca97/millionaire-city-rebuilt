@@ -80,10 +80,8 @@ export async function mountIconLayer(ctx: UiContext, sys: MissionSystem, describ
   const layer = document.createElement("div");
   layer.className = "mc-mission-icons";
   layer.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:4";
-  // The original adds the icons to the HUD at x = 5 of a 760 px stage; on a wider window the virtual stage is centred like the rest of the HUD.
-  const place = (): void => void (layer.style.transform = `translateX(${Math.max(0, Math.round((window.innerWidth - 760) / 2))}px)`);
-  place();
-  window.addEventListener("resize", place);
+  // The original adds the icons to the HUD at x = 5 of a 760 px stage. Here they stay at x = 5 of the window itself, so on a wider window
+  // they hug the left screen edge instead of the centred stage (identical at the 760 px width the parity harness uses).
   ctx.root.appendChild(layer);
   uiBus.on("visitorChrome", ({ on }) => void (layer.style.display = on ? "none" : "")); // RoleVisitor: no mission icons (oracle compare4 visit)
   const mgr = sys.manager;

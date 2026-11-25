@@ -36,14 +36,12 @@ build:
 server:
 	cd apps/server-rs && cargo build --release
 
-$(SERVER_BIN):
-	$(MAKE) server
-
-run: $(SERVER_BIN)
+# run/dev/conformance always go through cargo (a no-op in about a second when nothing changed), so edited server code is rebuilt.
+run: server
 	@[ -d apps/client/dist ] || $(MAKE) build
 	MCITY_HTTP_PORT=$(PORT) MCITY_DB_PATH=$(DB) MCITY_DISABLE_FB_SHIM=1 $(SERVER_BIN)
 
-dev: $(SERVER_BIN)
+dev: server
 	@echo "server on :$(PORT), client dev server on :5176"
 	@(MCITY_HTTP_PORT=$(PORT) MCITY_DB_PATH=$(DB) MCITY_DISABLE_FB_SHIM=1 $(SERVER_BIN)) & \
 	 SERVER=$$!; trap 'kill $$SERVER 2>/dev/null' EXIT INT TERM; cd apps/client && MCITY_SERVER=http://127.0.0.1:$(PORT) npx vite
@@ -56,7 +54,7 @@ test:
 typecheck:
 	cd apps/client && npx tsc --noEmit
 
-conformance: $(SERVER_BIN)
+conformance: server
 	npm run conformance -w @mcity/conformance
 
 check: typecheck test

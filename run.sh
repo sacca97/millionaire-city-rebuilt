@@ -8,5 +8,7 @@ export MCITY_DISABLE_FB_SHIM=1
 PORT="${MCITY_HTTP_PORT:-31803}"
 echo "Open http://127.0.0.1:$PORT/"
 BIN=apps/server-rs/target/release/mcity-server
-[ -x "$BIN" ] || (cd apps/server-rs && cargo build --release)
+# Always ask cargo: it rebuilds only when the server sources changed.
+if command -v cargo >/dev/null; then (cd apps/server-rs && cargo build --release); fi
+[ -x "$BIN" ] || { echo "no server binary and no cargo: install Rust (https://rustup.rs)"; exit 1; }
 exec "$BIN"

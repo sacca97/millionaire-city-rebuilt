@@ -4,6 +4,7 @@
   "private": true,
   "description": "Oracle harness: original Flash client (Electron 10 + Pepper Flash) for parity checks. Standalone, not a root workspace: a root npm install cannot touch its Electron.",
   "devDependencies": {
-    "electron": "10.4.7"
+    "electron": "10.4.7",
+    "playwright-core": "1.58.2"
   }
 }

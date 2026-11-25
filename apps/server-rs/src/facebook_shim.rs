@@ -24,6 +24,7 @@ pub struct FacebookShim {
     pub current_user_id: String,
     pub repo: Arc<SaveRepository>,
     pub config: Arc<ServerConfig>,
+    pub lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 pub fn transparent_gif() -> Vec<u8> {
@@ -138,7 +139,7 @@ mod tests {
     fn shim(dir: &std::path::Path) -> FacebookShim {
         let config = Arc::new(get_server_config());
         let repo = Arc::new(SaveRepository::new(Arc::new(Database::open(&dir.join("t.sqlite")).unwrap())));
-        FacebookShim { current_user_id: "100000000000001".into(), repo, config }
+        FacebookShim { current_user_id: "100000000000001".into(), repo, config, lock: Default::default() }
     }
 
     fn get(path: &str, query: &[(&str, &str)]) -> Req {

@@ -41,7 +41,8 @@ pub struct AppState {
     pub archived_item_swfs: HashSet<String>,
     pub client_static: Option<ClientStatic>,
     /// The TS server is single-threaded: every state-touching request runs to completion alone. Same here.
-    pub lock: tokio::sync::Mutex<()>,
+    /// Shared with the Facebook shim: every request that touches the save runs alone.
+    pub lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 /// Express' default error page for body-parser failures / handler exceptions.
@@ -494,6 +495,7 @@ pub async fn start(mut config: ServerConfig) -> Result<RunningServer, String> {
         None
     };
 
+    let lock = Arc::new(tokio::sync::Mutex::new(()));
     let state = Arc::new(AppState {
         commands: CommandService::new(repo.clone()),
         repo: repo.clone(),
@@ -502,7 +504,7 @@ pub async fn start(mut config: ServerConfig) -> Result<RunningServer, String> {
         level_xp_thresholds,
         archived_item_swfs,
         client_static,
-        lock: tokio::sync::Mutex::new(()),
+        lock: lock.clone(),
         config: config.clone(),
     });
     let app: Router = Router::new().fallback(entry).with_state(state);
@@ -521,6 +523,7 @@ pub async fn start(mut config: ServerConfig) -> Result<RunningServer, String> {
             current_user_id: config.launcher_user_id.clone(),
             repo: repo.clone(),
             config: Arc::new(config.clone()),
+            lock: lock.clone(),
         });
         let fb_app = Router::new().fallback(move |request: Request| {
             let shim = shim.clone();
@@ -552,8 +555,13 @@ async fn fb_entry(shim: Arc<FacebookShim>, request: Request) -> Resp {
         headers: parts.headers,
         body: Value::Null,
     };
+    // users.getInfo / the profile picture read the save (and ensure_default_user can write it): same lock as /Game.
+    let resp = {
+        let _g = shim.lock.lock().await;
+        shim.handle(&req).await
+    };
     // The shim's own Express app does not disable x-powered-by (the main app does).
-    http::with_header(shim.handle(&req).await, "x-powered-by", "Express")
+    http::with_header(resp, "x-powered-by", "Express")
 }
 
 #[cfg(unix)]

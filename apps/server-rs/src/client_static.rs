@@ -44,6 +44,24 @@ fn accepts(accept: &str, token: &str) -> bool {
     accept.split(|c: char| !c.is_ascii_alphanumeric() && c != '_').any(|t| t == token)
 }
 
+/// The single path guard for this module: decodes `path` and returns the file under `root` it names, or `None` when any
+/// segment is `.`/`..`, holds a NUL or a ':' (Windows drive or stream), or the path uses '\\' (another separator on
+/// Windows). `Path::join` keeps `..` and `Path::starts_with` compares components, so checking the joined path is not enough.
+fn resolve(root: &Path, path: &str) -> Option<(String, PathBuf)> {
+    let rel = decode_uri_component(path)?;
+    if rel.contains('\\') || rel.contains('\0') {
+        return None;
+    }
+    let mut abs = root.to_path_buf();
+    for seg in rel.split('/').filter(|s| !s.is_empty()) {
+        if seg == "." || seg == ".." || seg.contains(':') {
+            return None;
+        }
+        abs.push(seg);
+    }
+    Some((rel, abs))
+}
+
 impl ClientStatic {
     pub fn new(root: PathBuf) -> Self {
         ClientStatic { root, gz_cache: Mutex::new(HashMap::new()) }
@@ -60,10 +78,9 @@ impl ClientStatic {
         if lower.ends_with(".png")
             && ["/gui/", "/ground/", "/sprites/"].iter().any(|p| path.starts_with(p))
         {
-            if let Some(rel) = decode_uri_component(&path) {
-                let abs = self.root.join(rel.trim_start_matches('/'));
-                let webp = PathBuf::from(format!("{}.webp", &abs.to_string_lossy()[..abs.to_string_lossy().len() - 4]));
-                if abs.starts_with(&self.root) && !abs.exists() && webp.exists() {
+            if let Some((_, abs)) = resolve(&self.root, &path) {
+                let webp = abs.with_extension("webp");
+                if !abs.exists() && webp.exists() {
                     path = format!("{}.webp", &path[..path.len() - 4]);
                 }
             }
@@ -77,13 +94,9 @@ impl ClientStatic {
     }
 
     fn compressed(&self, req: &Req, path: &str) -> Option<Resp> {
-        let rel = decode_uri_component(if path == "/" { "/index.html" } else { path })?;
+        let (rel, abs) = resolve(&self.root, if path == "/" { "/index.html" } else { path })?;
         let ext = Path::new(&rel).extension().and_then(|e| e.to_str()).map(|e| format!(".{e}")).unwrap_or_default();
         if !TEXT_TYPES.contains(&ext.as_str()) {
-            return None;
-        }
-        let abs = self.root.join(rel.trim_start_matches('/'));
-        if !abs.starts_with(&self.root) {
             return None;
         }
         let accept = req.header("accept-encoding").unwrap_or("");
@@ -127,11 +140,7 @@ impl ClientStatic {
     }
 
     async fn files(&self, req: &Req, path: &str) -> Option<Resp> {
-        let rel = decode_uri_component(path)?;
-        if rel.split('/').any(|s| s == "..") {
-            return None;
-        }
-        let mut target = self.root.join(rel.trim_start_matches('/'));
+        let (rel, mut target) = resolve(&self.root, path)?;
         let mut rel_for_cache = rel.clone();
         if target.is_dir() {
             if !req.original_url.split('?').next().unwrap_or("").ends_with('/') {
@@ -144,5 +153,29 @@ impl ClientStatic {
             return None;
         }
         Some(send_file(req, &target, &cache_control(&rel_for_cache), None).await)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve;
+    use std::path::Path;
+
+    #[test]
+    fn resolve_rejects_paths_that_leave_the_root() {
+        let root = Path::new("/srv/dist");
+        for bad in [
+            "/../etc/passwd",
+            "/%2e%2e/%2e%2e/home/u/x.json",
+            "/gui/../../x.json",
+            "/./index.html",
+            "/..%5c..%5cx.png",
+            "/C:/Windows/win.ini",
+            "/a%00.json",
+        ] {
+            assert!(resolve(root, bad).is_none(), "{bad} must be rejected");
+        }
+        assert_eq!(resolve(root, "/gui/a%20b.png").unwrap().1, root.join("gui/a b.png"));
+        assert_eq!(resolve(root, "/").unwrap().1, root.to_path_buf());
     }
 }

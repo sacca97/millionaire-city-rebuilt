@@ -3,7 +3,7 @@
 
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 #[derive(Debug, Clone)]
@@ -28,6 +28,8 @@ pub struct Database {
     pub db_path: PathBuf,
     /// A [`Batch`] transaction is open.
     in_batch: AtomicBool,
+    /// Bumped whenever a request's writes were rolled back; caches of what was written must be dropped.
+    pub rollbacks: AtomicU64,
 }
 
 /// One SQLite transaction around everything a request writes (`BEGIN IMMEDIATE` .. `COMMIT` on drop). Without it every
@@ -45,9 +47,30 @@ impl Drop for Batch<'_> {
     fn drop(&mut self) {
         if self.owner {
             self.db.in_batch.store(false, Ordering::SeqCst);
-            if let Err(e) = self.db.conn().execute_batch("COMMIT") {
-                eprintln!("[mcity] commit failed: {e}");
+            let conn = self.db.conn();
+            // A failed COMMIT leaves the transaction open; every later BEGIN would then fail and nothing would ever commit
+            // again. Retry briefly (SQLITE_BUSY from another process), then roll back so the next request starts clean, and
+            // bump `rollbacks` so the document cache (which already holds the rolled-back values) is dropped.
+            let mut last = None;
+            for attempt in 0..5 {
+                match conn.execute_batch("COMMIT") {
+                    Ok(()) => return,
+                    Err(e) => {
+                        last = Some(e);
+                        if conn.is_autocommit() {
+                            break; // SQLite already ended the transaction itself
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(20 << attempt));
+                    }
+                }
             }
+            eprintln!("[mcity] commit failed, request writes rolled back: {}", last.map(|e| e.to_string()).unwrap_or_default());
+            if !conn.is_autocommit() {
+                if let Err(e) = conn.execute_batch("ROLLBACK") {
+                    eprintln!("[mcity] rollback failed: {e}");
+                }
+            }
+            self.db.rollbacks.fetch_add(1, Ordering::SeqCst);
         }
     }
 }
@@ -121,7 +144,7 @@ impl Database {
             conn.execute_batch("PRAGMA synchronous = NORMAL").map_err(|e| e.to_string())?;
         }
         conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
-        Ok(Database { conn: Mutex::new(conn), db_path, in_batch: AtomicBool::new(false) })
+        Ok(Database { conn: Mutex::new(conn), db_path, in_batch: AtomicBool::new(false), rollbacks: AtomicU64::new(0) })
     }
 
     /// Starts the request transaction (a no-op guard when one is already open); see [`Batch`].
@@ -200,6 +223,29 @@ mod tests {
 
     fn count_users(path: &Path) -> i64 {
         Connection::open(path).unwrap().query_row("SELECT COUNT(*) FROM users", [], |r| r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn failed_commit_rolls_back_so_later_requests_commit() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open(&dir.path().join("f.sqlite")).unwrap();
+        db.conn().execute_batch("PRAGMA foreign_keys = ON").unwrap();
+        {
+            let _b = db.begin_batch();
+            // A deferred foreign-key violation makes COMMIT itself fail and leaves the transaction open.
+            db.conn().execute_batch("PRAGMA defer_foreign_keys = ON").unwrap();
+            db.conn()
+                .execute("INSERT INTO sessions (user_id, token, sync, created_at, updated_at) VALUES (9, 't', 1, 'a', 'a')", [])
+                .unwrap();
+        }
+        assert!(db.conn().is_autocommit(), "the failed transaction must not stay open");
+        assert_eq!(db.rollbacks.load(Ordering::SeqCst), 1);
+        {
+            let _b = db.begin_batch();
+            assert!(db.in_batch(), "the next request gets its own transaction");
+            db.conn().execute("INSERT INTO users (id, ext_id, name, created_at) VALUES (1, 'a', 'n', 't')", []).unwrap();
+        }
+        assert_eq!(count_users(&db.db_path), 1);
     }
 
     #[test]
