@@ -72,8 +72,11 @@ global cargo `build.target-dir` work for `make`, `run.sh`, conformance, the clie
 Measured opportunities still open from `docs/perf-review.md`:
 
 - ground overdraw: the opaque backdrop plus terrain/road tiles draw roughly 3.5x the screen;
-- asset atlases: ~1,074 boot requests and many unique textures;
-- the 5-minute memory soak has not been repeated since the shop virtualisation.
+- asset atlases: ~1,074 boot requests and many unique textures.
+
+A 5-minute headless idle soak is now automated with `tools/perf/soak.mjs`. On the post-tutorial starter save the JS heap
+sawtoothed between 10.6 and 17.7 MB (GC drops, no upward trend), DOM nodes settled at 1,992 and item views stayed at 65.
+The stress-city soak from `docs/perf-review.md` (445 items) has not been repeated.
 
 ### Packaging
 
