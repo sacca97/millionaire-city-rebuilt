@@ -7,8 +7,9 @@ export MCITY_DB_PATH="${MCITY_DB_PATH:-$HOME/mcity.sqlite}"
 export MCITY_DISABLE_FB_SHIM=1
 PORT="${MCITY_HTTP_PORT:-31803}"
 echo "Open http://127.0.0.1:$PORT/"
-BIN=apps/server-rs/target/release/mcity-server
+# Cargo may build outside apps/server-rs/target (CARGO_TARGET_DIR or ~/.cargo/config.toml target-dir).
+BIN="$(node tools/server-binary.mjs)"
 # Always ask cargo: it rebuilds only when the server sources changed.
 if command -v cargo >/dev/null; then (cd apps/server-rs && cargo build --release); fi
-[ -x "$BIN" ] || { echo "no server binary and no cargo: install Rust (https://rustup.rs)"; exit 1; }
+[ -x "$BIN" ] || { echo "no server binary at $BIN and no cargo: install Rust (https://rustup.rs)"; exit 1; }
 exec "$BIN"

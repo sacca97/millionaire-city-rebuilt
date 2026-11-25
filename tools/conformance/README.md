@@ -9,12 +9,12 @@ server (`apps/server-rs`, binary `mcity-server`); all tests, including the NPC f
 
 ```sh
 make server        # cargo build --release in apps/server-rs (once, and after server changes)
-make conformance   # the whole suite against apps/server-rs/target/release/mcity-server
+make conformance   # the whole suite against the release binary (path resolved through tools/server-binary.mjs)
 # a single file / test name filter
 npm run conformance -w @mcity/conformance -- offline
 # against another binary or command (any shell command that starts the server, configured only through the env vars of
 # docs/rust-server-plan.md: MCITY_HTTP_PORT, MCITY_HTTPS_PORT, MCITY_FACEBOOK_PORT, MCITY_DB_PATH, MCITY_CLIENT_DIST, ...)
-MCITY_SERVER_CMD="$PWD/apps/server-rs/target/debug/mcity-server" npm run conformance -w @mcity/conformance
+MCITY_SERVER_CMD="$(node tools/server-binary.mjs --debug)" npm run conformance -w @mcity/conformance
 ```
 
 The command is run as `sh -c "exec $MCITY_SERVER_CMD"` (so it cannot start with `VAR=value`, put variables in the environment).
@@ -23,7 +23,7 @@ Environment knobs of the suite itself:
 
 | variable | meaning |
 | --- | --- |
-| `MCITY_SERVER_CMD` | shell command that starts the server under test (default: `apps/server-rs/target/release/mcity-server`) |
+| `MCITY_SERVER_CMD` | shell command that starts the server under test (default: the release binary resolved by `tools/server-binary.mjs`) |
 | `MCITY_SERVER_CWD` | working directory of that command (default: the repository root) |
 | `CONF_LIVE_SEED=1` | seed the database while the server keeps running instead of stop/write/start (only valid for servers that read the DB on every request; the Rust server caches, so do not use it) |
 | `CONF_WORKERS` | number of test files running in parallel (default 6; each server uses 3 ports of 32200-32399) |

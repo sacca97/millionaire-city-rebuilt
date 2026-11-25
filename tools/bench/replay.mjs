@@ -17,13 +17,14 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { serverBinaryPath } from "../server-binary.mjs";
 const here = path.dirname(new URL(import.meta.url).pathname);
 const root = path.resolve(here, "../..");
 const require = createRequire(path.join(root, "tools/conformance/package.json"));
 const Database = require("better-sqlite3");
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, x, i, all) => (x.startsWith("--") ? [...a, [x.slice(2), all[i + 1]?.startsWith("--") || all[i + 1] === undefined ? "1" : all[i + 1]]] : a), []));
-const BIN = path.resolve(args.bin ?? "apps/server-rs/target/release/mcity-server");
+const BIN = path.resolve(args.bin ?? serverBinaryPath());
 const PORT = Number(args.port ?? 33000);
 const OUT = path.resolve(args.out ?? path.join(os.tmpdir(), "mcity-bench"));
 const ROUNDS = Number(args.rounds ?? 20), CLIENTS = Number(args.clients ?? 4), SECONDS = Number(args.seconds ?? 5);

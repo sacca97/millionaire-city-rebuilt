@@ -4,6 +4,8 @@ Millionaire City Rebuilt is a fan-made local revival of the `0.501` Millionaire 
 
 This project is not affiliated with Digital Chocolate, Ubisoft, or Facebook.
 
+Current development status, verification results and known gaps: `docs/status.md`. Release notes: `docs/release-0.2.0.md`.
+
 ## Download And Play
 
 For normal play, use a portable release for your operating system:

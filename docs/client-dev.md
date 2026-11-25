@@ -26,7 +26,7 @@ java -jar generated/tools/ffdec-26.0.0/ffdec.jar -export script decompiled asset
 ```text
 npm ci
 npm run build -w @mcity/shared
-make server && MCITY_DB_PATH=tmp/dev.sqlite apps/server-rs/target/release/mcity-server   # game server (Rust), http://127.0.0.1:31803
+make server && MCITY_DB_PATH=tmp/dev.sqlite "$(node tools/server-binary.mjs)"   # game server (Rust), http://127.0.0.1:31803
 npm run dev -w @mcity/client                                  # http://127.0.0.1:5173 (proxies /Game and /mcity)
 ```
 

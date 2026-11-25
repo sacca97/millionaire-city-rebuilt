@@ -39,6 +39,10 @@ the reference until the Rust server passes the whole conformance suite; then the
 
 ## Porting packages
 
+> **Historical tables.** The per-module "Status" columns below record the wave-1/wave-2 plan; every `todo`/`stub` row has
+> since been implemented (all `cmdList` commands, `save_defaults.rs` seeding, `get_world`, NPC friends). See
+> `docs/status.md` for the current state and test counts, and `docs/rust-server-e2e.md` for the end-to-end evidence.
+
 Status of the scaffold (wave 1): everything outside the command handlers is ported and verified byte-for-byte against the TS
 server (see "Scaffold verification" below). Layout of `apps/server-rs/` (`cargo build`, `cargo test`; binary `mcity-server`):
 

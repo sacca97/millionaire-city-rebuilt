@@ -1,6 +1,11 @@
 # Client performance review (measured)
 
-Branch `rewrite-ts-client` @ `993bffb`. Nothing in the product was changed. Companion to `docs/performance.md` (earlier optimisation round) and the static, unmeasured `docs/perf-audit.md`.
+Branch `rewrite-ts-client` @ `993bffb`. Nothing in the product was changed at the time of the measurements. Companion to `docs/performance.md` (earlier optimisation round) and the static, unmeasured `docs/perf-audit.md`.
+
+> **Since this review:** recommendations 1 (resolution cap), 3 (adaptive idle FPS), 4 (shop page virtualisation),
+> 6 (`/assets/*` immutable cache) and 10's per-item `Graphics` removal are implemented; recommendation 10's finer
+> ground chunks are not. Recommendations 2 (ground overdraw), 5 (atlases), 7 (backdrop texture), 8 (defer GUI) and
+> the 5-minute memory soak remain open. See `docs/status.md`.
 
 Each claim is tagged **[M]** measured, **[C]** code reading, or **[E]** estimate.
 

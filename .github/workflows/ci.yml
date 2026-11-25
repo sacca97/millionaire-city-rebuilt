@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Client, server and conformance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/server-rs/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('apps/server-rs/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build the server (client integration tests and conformance use it)
+        run: make server
+
+      - name: TypeScript types
+        run: make typecheck
+
+      - name: Client, rules and server tests
+        run: make test
+
+      - name: Black-box conformance suite
+        run: make conformance

@@ -28,7 +28,11 @@ Gaps to flag: no server simulation of help/neighbor visits (`get_neighbor_info` 
 
 ## 1. First-session walkthrough (tutorial) **(read)**
 
-> **Implementation status (core-loop controller, `apps/client/src/game/game.ts`):** the tutorial itself (splash, boss select, forced steps a-end below) is **deferred, not implemented**. `Game.boot` handles the server side: the server serves a tutorial-stage world until `update_profile tutorial_completed` has been persisted, and `repository.ts` *resets the whole save* if houses/HQ exist while `tutorialEnd != "1"`. So when `Profile@tutorialEnd != "1"` boot sends `tutorialCompleted()` first (server then normalises to the completed-tutorial starter: HQ, house, tree, roads, terrain) and re-fetches `get_world`; `game.tutorialSkipped` reports it. Consequences: no boss selection (`boss_genre` never set), construction timers run from the first session (original froze them until `smTutorialEnd`), contracts use the post-tutorial `signContract` payload (`tutorialEnd: true`), music should use the main track.
+> **Implementation status: implemented.** `apps/client/src/game/tutorial.ts` is the pure state machine (steps, restrictions,
+> tutorial positions) and `apps/client/src/ui/tutorial/` the popup/arrow/intro controller. `Game.boot` starts it while
+> `Profile@tutorialEnd != "1"`; `?skipTutorial` is the development shortcut that completes it on the server. The walkthrough
+> below documents the original behaviour used as the reference; the remaining cosmetic differences are listed in
+> `docs/tutorial-parity.md` (for example the friends-bar spinner and the Cindy label wrap).
 
 Trigger: `UserDataFacade.isTutorialRequired()` is true when the universe XML `Profile@tutorialEnd == "0"` (default true if the attribute is absent) (`model/userdata/UserDataFacade.as:906-919`). `DollarsGame.ronaldsCityStateIsRequired()` = required AND `!Tutorial.smTutorialEnd` (`flow/DollarsGame.as:1009`). `Profile.setPersistence` sets `Tutorial.smTutorialEnd = (@tutorialEnd == 1)` (`model/profile/Profile.as:1109`; missing attribute forces true, `:1114-1116`).
 

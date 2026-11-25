@@ -219,11 +219,13 @@ const NO_GAIN = { exp: 0, coins: 0, cash: 0 };
 
 const SELL_BAR_MS = 3000; // StateOnIA SELL_BAR_TIME, reported as the MODE_BUYING time
 
+// StateOnRent MODE_GIVING_RENT waits for Event_commerce_ok (contract_event.swf: 32 frames at 12 fps = 2.67 s) in the SWF, but the
+// oracle runs still showed the saved item in mode 6 with time 0 after 10+ s; keep a window >= that observation.
 const GIVING_RENT_MS = 20_000;
 
-// NotificationConstructionEnd (non-effective): Notification.enter plays Event_Contract_anim_ok (houses_info: 42 frames at 30 fps) and only its
-// last frame (checkEnd) runs onAccept -> initItemAfterConstruction, i.e. the new_state goes out ~1.4 s after the item's time ran out.
-const CONSTRUCTION_END_ANIM_MS = 3000;
+// NotificationConstructionEnd (non-effective): Notification.enter plays Event_Contract_anim_ok and only its last frame (checkEnd)
+// runs onAccept -> initItemAfterConstruction. houses_info.swf: Event_Contract_anim_ok is 42 frames at 30 fps = 1.4 s.
+const CONSTRUCTION_END_ANIM_MS = 1400;
 
 export class Game extends Emitter<GameEvents> implements ToolHost {
   readonly world: GameWorld;

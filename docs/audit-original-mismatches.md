@@ -1,12 +1,15 @@
 # Audit: places where the TS client differs from the original ActionScript
 
-Scope: ordering, filtering, grouping, paging, defaults, rounding and formatting in `apps/client/src` and `packages/rules/src`, compared with `decompiled/scripts/**` and the rules XML. Each finding below was confirmed by reading both sides. Nothing was changed in code.
+Scope: ordering, filtering, grouping, paging, defaults, rounding and formatting in `apps/client/src` and `packages/rules/src`, compared with `decompiled/scripts/**` and the rules XML. Each finding below was confirmed by reading both sides. The finding text is retained as written; the **Status** lines record the later fixes (commit `7fccade8` unless noted). See `docs/status.md` for what is still open.
 
 Areas checked and found to match the original (no action): shop tab membership (type tab + `shopTab` list, `new_items`, limEd), shop price/discount rounding, `unlockSegments` price, storage sort (`mOrder`, then `mSku` case-insensitive) and page size 4, collectibles tab order and per-group sort, invest list sort (`sortInvestmentsUI`), friends bar rank (`count - index`) and page size 8, expansion price table, destroy/sell/abandon/move/instant-build truncation, contract cost/refund truncation, `convertNumberToString` / `convertTimeToString` / `convertTimeToStringCollon`, daily-bonus gain rules, box-prize exp, incomeTime/constructionTime conversion (checked against every XML value: trunc vs round gives identical results).
 
 ---
 
 ## F1 (high) Level-up popup lists the wrong set of items, in the wrong order
+
+- **Status: FIXED.** `ui/shop/catalog.ts` `levelUpItems` applies `isAllowedInShop` plus the level-up exclusions
+  (`unlockCondition == level`, no clubs/bundles), in shop-comparator order; `ui/popups/levelUp.ts` uses it.
 
 - Ours: `apps/client/src/ui/popups/levelUp.ts:20-27` (`unlockedSkusAtLevel`), used for the count text and the cards at `:49-50`.
 - Original: `GUI/PopupLevel.as:229` calls `ItemDefinitionManager.getItemsByLevel(level, -1, ItemDefinition.isAllowedToBeInLevelUp)`. That runs `ItemDefinitionManager.checkLevel` (`ItemDefinitionManager.as`, override: `unlockCondition == LEVEL && level == n`) and `ItemDefinition.isAllowedToBeInLevelUp` (`ItemDefinition.as:1280-1325`). Order comes from `DefinitionManager.getDefinitionsWithCondition` (`DefinitionManager.as:~190`): type 0..4, each type array already sorted with the shop comparator (level, coins, exp).
@@ -24,6 +27,9 @@ Areas checked and found to match the original (no action): shop tab membership (
 
 ## F2 (high) Contract popup info box shows the wrong income (and XP)
 
+- **Status: FIXED.** `game/game.ts` `option()` now uses `c.incomeCoins` / `c.incomeXP`; `ui/popups/contract.ts`
+  selects the club info-box clip.
+
 - Ours: `apps/client/src/game/game.ts:1280-1297` (`option()`): `income` is `getIncomeValue({... influenceValue: influencePercent(sid)})` for houses and `commerceInfoIncome` (population, influence, level factor) for clubs. `xp` is `def.incomeXP + contract.incomeXP`. Shown at `ui/popups/contract.ts:80-82`.
 - Original: `GUI/infoBox/InfoBoxContract.as:63-64` shows `ContractItem.getIncomeCoins()` / `getIncomeXP()`. `ContractItem.setContractDefinition` (`ContractItem.as:123-140`) only accumulates `contract.getIncomeCoins() * 1` and `contract.getIncomeXP() * 1`. No influence, no upgrade percentage, no population, no definition income.
 - Example: a house in a street with decoration influence +10% and contract "Students" (incomeCoins 1230): original shows `$1,230`, ours shows `$1,353`. For a commerce/club contract ours multiplies by the affected population; the original shows the raw contract value.
@@ -32,12 +38,16 @@ Areas checked and found to match the original (no action): shop tab membership (
 
 ## F3 (medium) Friends bar company value uses the wrong formatter
 
+- **Status: FIXED.** `ui/hud/friends.ts` uses `convertNumberRanking`.
+
 - Ours: `apps/client/src/ui/hud/friends.ts:211`: `convertNumberToString(n.companyValue, TRUNCATE_MILLIONS, 6)`.
 - Original: `friends/FriendsBarContentFriend.as:116` and `:141` use `TextManager.convertNumberRanking(companyValue)` (`TextManager.as:481-545`). `convertNumberRanking` already exists in `gui/format.ts` and is used for the invest list (`invest.ts:235`).
 - Examples (original vs ours): 250,000 -> `$250K` vs `$250,000`; 12,345 -> `$12K` vs `$12,345`; 12,345,678 -> `$12.3M` vs `$12M`; 1,500,000 -> `$1.50M` both; 100,000,000 -> `$100M` both. Values below 1000 return `""` in the original (the TS version returns the number, see note in `format.ts:95`; harmless for real values).
 - Fix: use `convertNumberRanking` in `friends.ts:211`.
 
 ## F4 (medium) Shop sort ignores the gold/FB-credits price tier
+
+- **Status: FIXED.** `ui/shop/catalog.ts` `compareItems` compares `fbc` before coins.
 
 - Ours: `apps/client/src/ui/shop/catalog.ts:303-310` (`compareItems`): level, then coins, then exp.
 - Original: `ItemDefinitionManager.as:119-146` (`sortCompareSameLevelFunction`): within a level it first compares `getConstructionFBCredits()` (XML `constructionFBC`, same rule: smaller non-zero first), then `getConstructionCoins()`, then exp.
@@ -62,6 +72,10 @@ Areas checked and found to match the original (no action): shop tab membership (
 
 ## F6 (low-medium) Shop "Featured" tab ignores server offers and free items
 
+- **Status: PARTIAL.** `ui/shop/catalog.ts` includes offers and free items in Featured and sorts offers first.
+  The original also removes an item from Featured when its offer disappears; our state has no offer-removal signal,
+  so that edge case is not modelled.
+
 - Ours: `apps/client/src/ui/shop/catalog.ts:318-320`: featured = XML `featured` attribute only; offers only reorder (`:326-329`).
 - Original: the featured list also receives every item that gets an `offerDef` (`ItemDefinition.as:302-314`), every bundle (`BundleDefinition.as:38-39`) and every free item (`OfferManager.addFreeItem`, `OfferManager.as:45-54`), and an item that loses its offer is removed from it even when the XML marked it featured (`ItemDefinition.as:305-308`).
 - Impact only when the server sends offers/free items.
@@ -82,7 +96,9 @@ Areas checked and found to match the original (no action): shop tab membership (
 
 ---
 
-## Prioritised list
+## Prioritised list (original order; see the Status lines above)
+
+F1-F4 are fixed and F6 is partial. F5's locked-preview compare is fixed; its Up-list note still needs an oracle/save check.
 
 1. F1 level-up item list (wrong items and count shown on every level-up).
 2. F2 contract info box income/XP (wrong number shown for any house with influence, and for clubs/commerces).

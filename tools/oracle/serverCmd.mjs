@@ -1,14 +1,14 @@
 // Game server for the harness: the Rust binary, started behind cmdlog-proxy.cjs (which keeps the cmds.jsonl log). Default
-// apps/server-rs/target/release/mcity-server, else the debug build; MCITY_ORACLE_SERVER_CMD=<path to a binary> overrides.
+// release binary, else the debug build, both resolved through tools/server-binary.mjs (honours cargo target-dir);
+// MCITY_ORACLE_SERVER_CMD=<path to a binary> overrides.
 // Inner (real) server ports: MCITY_ORACLE_INNER_BASE,
 // default 31863 when the public base is 31853, 31853 when it is 31863, else base+10.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { existingServerBinary } from "../server-binary.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url)), root = path.resolve(here, "../..");
-const exe = process.platform === "win32" ? "mcity-server.exe" : "mcity-server";
-const targetBin = (profile) => path.join(root, "apps/server-rs/target", profile, exe);
-export const serverCmd = process.env.MCITY_ORACLE_SERVER_CMD || (fs.existsSync(targetBin("release")) ? targetBin("release") : targetBin("debug"));
+export const serverCmd = process.env.MCITY_ORACLE_SERVER_CMD || existingServerBinary() || path.join(root, "apps/server-rs/target/release", process.platform === "win32" ? "mcity-server.exe" : "mcity-server");
 if (!fs.existsSync(serverCmd)) throw new Error(`server binary not found: ${serverCmd}. Run \`make server\` or set MCITY_ORACLE_SERVER_CMD.`);
 // returns [{cmd,args,opts,log}] to spawn (proxy first). env: the vars the server gets (MCITY_DB_PATH, MCITY_CMDLOG, ...).
 export function rustServerSpecs({ pubBase, dbPath, cmdlog, tmp }) {

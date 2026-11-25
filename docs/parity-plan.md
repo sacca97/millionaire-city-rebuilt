@@ -2,7 +2,14 @@
 
 Handoff document. Goal: a TypeScript client (`apps/client`) that is equivalent to the original Flash game (0.501), running against the existing server (the server, now `apps/server-rs` (Rust), which keeps the original save/protocol format). Written so another agent (e.g. Codex) can continue without this session's context.
 
-Status snapshot: final handover; all subagents have finished and all test servers are stopped (no ports listening). Testing was deliberately stopped here. Results of the last runs: client 219 tests (28 files), server 106 (3 files), rules 15, `tsc --noEmit` clean in client and server. Detailed results: `docs/parity-audit.md` (formulas), `docs/visual-parity.md` (screens, Round 1-3 tables), `docs/tutorial-parity.md` (tutorial + save diff).
+> **Status snapshot (2026-11-25):** the rounds below are the chronological record. Current state: client 1,201 tests
+> (34 files), rules 15, Rust server 60, conformance 209/209, `tsc --noEmit` clean. The tutorial is implemented
+> (`game/tutorial.ts`, `ui/tutorial/`) and all missions are MATCH/STATIC (TODO 0). Remaining known differences are
+> C26 instant build, C20-55, the alt C08-96 reload, and the F5/F6 details: see `docs/status.md`.
+>
+> Historical handover snapshot: client 219 tests (28 files), server 106 (3 files), rules 15, `tsc --noEmit` clean in
+> client and server. Detailed results: `docs/parity-audit.md` (formulas), `docs/visual-parity.md` (screens, Round 1-3
+> tables), `docs/tutorial-parity.md` (tutorial + save diff).
 
 ## 1. What exists
 

@@ -121,7 +121,8 @@ export class ItemView {
   private clips = new Map<ClipName, Layer>();
   private generic?: Texture;
   private icon = new Sprite();
-  private bar = new Graphics();
+  /** Only allocated with SHOW_CONSTRUCTION_BAR (the bar is off in 0.501; avoid a Graphics per item). */
+  private bar?: Graphics;
   private barAnchor = { x: 0, y: 0 };
   private fps = DEFAULT_FPS;
   private observedMax = 0;
@@ -142,7 +143,12 @@ export class ItemView {
     this.container.zIndex = cfg.depth;
     this.container.addChild(this.main);
     this.icon.visible = false;
-    this.top.addChild(this.bar, this.icon);
+    if (SHOW_CONSTRUCTION_BAR) {
+      this.bar = new Graphics();
+      this.top.addChild(this.bar, this.icon);
+    } else {
+      this.top.addChild(this.icon);
+    }
     this.fps = assets.fps(cfg.sku);
   }
 
@@ -174,7 +180,7 @@ export class ItemView {
     }
     this.generic = await this.assets.genericBuilding(rows, cols);
     const bar = this.lib.symbol(sku, "BarPosition");
-    if (bar) {
+    if (SHOW_CONSTRUCTION_BAR && bar) {
       // mBarPosX/Y = BarPosition child position (ItemObject.as:2252); y is relative to the footprint top,
       // which in our bottom-left coordinates is simply offsetY.
       this.barAnchor = { x: bar.offsetX, y: bar.offsetY };
@@ -327,16 +333,13 @@ export class ItemView {
   }
 
   private applyBar(spec: VisualSpec): void {
-    const g = this.bar;
-    // The bar is never drawn while SHOW_CONSTRUCTION_BAR is off; clearing an empty Graphics every frame only dirtied the render group.
-    if (!SHOW_CONSTRUCTION_BAR) {
-      return;
-    }
-    g.clear();
     // Oracle (build-flow 07 / 09): a construction site shows no bar above the building - the remaining time is only in the hover box.
-    if (!SHOW_CONSTRUCTION_BAR || spec.progress === undefined) {
+    // 0.501 has the bar off, so there is no Graphics at all unless SHOW_CONSTRUCTION_BAR is enabled.
+    if (!this.bar || spec.progress === undefined) {
       return;
     }
+    const g = this.bar;
+    g.clear();
     // Approximation: the original DCFillBar art is not exported; draw a simple bar at the BarPosition anchor.
     const w = 40;
     const h = 6;

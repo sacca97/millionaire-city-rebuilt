@@ -4,7 +4,8 @@ PORT ?= 31803
 DB ?= $(HOME)/mcity.sqlite
 # OPT: auto = use apps/client/public-opt when it exists; 1 = force optimised assets; 0 = original assets
 OPT ?= auto
-SERVER_BIN := apps/server-rs/target/release/mcity-server
+# Cargo may build outside apps/server-rs/target (CARGO_TARGET_DIR or ~/.cargo/config.toml target-dir); ask cargo.
+SERVER_BIN = $(shell node tools/server-binary.mjs)
 
 .PHONY: help install build server run dev conformance test typecheck check clean bundle bundle-small app app-dev missions-status
 
@@ -46,7 +47,7 @@ dev: server
 	@(MCITY_HTTP_PORT=$(PORT) MCITY_DB_PATH=$(DB) MCITY_DISABLE_FB_SHIM=1 $(SERVER_BIN)) & \
 	 SERVER=$$!; trap 'kill $$SERVER 2>/dev/null' EXIT INT TERM; cd apps/client && MCITY_SERVER=http://127.0.0.1:$(PORT) npx vite
 
-test:
+test: server
 	npm run test -w @mcity/client
 	npm run test -w @mcity/rules
 	cd apps/server-rs && cargo test

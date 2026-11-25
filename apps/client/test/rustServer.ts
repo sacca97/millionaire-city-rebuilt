@@ -1,7 +1,7 @@
 // Starts the real game server (the Rust binary of apps/server-rs) on free ports with a given SQLite file, for the integration tests.
-// Binary: MCITY_SERVER_BIN, else apps/server-rs/target/release/mcity-server, else target/debug (build it with `make server`).
+// Binary: MCITY_SERVER_BIN, else the release build, else the debug build (resolved by tools/server-binary.mjs; build with `make server`).
 // The server caches documents in memory: write to the database file only while it is stopped (setDocument).
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -11,9 +11,27 @@ const ROOT = path.resolve(__dirname, "../../..");
 const EXE = process.platform === "win32" ? "mcity-server.exe" : "mcity-server";
 export const DEFAULT_UID = "100000000000001";
 
+/** `cargo metadata` target dir (honours CARGO_TARGET_DIR / a global cargo config), via tools/server-binary.mjs. */
+function cargoBinary(profile: "release" | "debug"): string | undefined {
+  try {
+    const helper = path.join(ROOT, "tools/server-binary.mjs");
+    const out = execFileSync(process.execPath, profile === "debug" ? [helper, "--debug"] : [helper], { encoding: "utf8" }).trim();
+    return out || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function serverBinary(): string {
-  const candidates = [process.env.MCITY_SERVER_BIN, path.join(ROOT, "apps/server-rs/target/release", EXE), path.join(ROOT, "apps/server-rs/target/debug", EXE)];
-  const found = candidates.find((c): c is string => Boolean(c) && fs.existsSync(c as string));
+  const env = process.env.MCITY_SERVER_BIN;
+  if (env && fs.existsSync(env)) return env;
+  for (const profile of ["release", "debug"] as const) {
+    const resolved = cargoBinary(profile);
+    if (resolved && fs.existsSync(resolved)) return resolved;
+  }
+  // Conventional paths, for a checkout built before this resolver existed.
+  const candidates = [path.join(ROOT, "apps/server-rs/target/release", EXE), path.join(ROOT, "apps/server-rs/target/debug", EXE)];
+  const found = candidates.find((c) => fs.existsSync(c));
   if (!found) throw new Error("server binary not found: run `make server` (cargo build --release in apps/server-rs) or set MCITY_SERVER_BIN");
   return found;
 }
